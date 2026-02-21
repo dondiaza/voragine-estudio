@@ -8,16 +8,23 @@ import ProcessSection from '@/components/sections/ProcessSection';
 import CTASection from '@/components/sections/CTASection';
 import ContactSection from '@/components/sections/ContactSection';
 
+const getApiUrl = () => {
+  if (process.env.NEXT_PUBLIC_API_URL) return process.env.NEXT_PUBLIC_API_URL;
+  if (process.env.VERCEL) return 'https://backend-vg.vercel.app/api';
+  return 'http://localhost:5000/api';
+};
+
 async function getData() {
+  const apiUrl = getApiUrl();
   try {
     const [contentRes, galleriesRes, categoriesRes] = await Promise.all([
-      fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api'}/content`, {
+      fetch(`${apiUrl}/content`, {
         cache: 'no-store',
       }),
-      fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api'}/galleries`, {
+      fetch(`${apiUrl}/galleries`, {
         cache: 'no-store',
       }),
-      fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api'}/categories`, {
+      fetch(`${apiUrl}/categories`, {
         cache: 'no-store',
       }),
     ]);
