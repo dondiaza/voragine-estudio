@@ -5,8 +5,8 @@ let isConnected = false;
 const dbConnect = async () => {
   const mongoUri = process.env.MONGODB_URI;
   
-  if (!mongoUri) {
-    console.log('MONGODB_URI not set, running without database');
+  if (!mongoUri || mongoUri.includes('example')) {
+    console.log('Running without database (no MONGODB_URI)');
     return false;
   }
   
@@ -24,8 +24,8 @@ const dbConnect = async () => {
     console.log(`MongoDB Connected: ${conn.connection.host}`);
     return true;
   } catch (error) {
-    console.error('MongoDB connection error:', error.message);
-    console.log('Running in demo mode without database');
+    console.log('MongoDB connection failed:', error.message);
+    console.log('Continuing without database');
     return false;
   }
 };

@@ -2,16 +2,6 @@ require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
 const path = require('path');
-const mongoose = require('mongoose');
-const dbConnect = require('./config/db');
-
-const adminRoutes = require('./routes/admin');
-const contentRoutes = require('./routes/content');
-const categoriesRoutes = require('./routes/categories');
-const galleriesRoutes = require('./routes/galleries');
-const contactRoutes = require('./routes/contact');
-const settingsRoutes = require('./routes/settings');
-const uploadRoutes = require('./routes/upload');
 
 const app = express();
 
@@ -22,22 +12,17 @@ app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
 app.get('/api/health', (req, res) => {
-  res.json({ 
-    status: 'ok', 
-    timestamp: new Date().toISOString(),
-    database: mongoose.connection.readyState === 1 ? 'connected' : 'disconnected'
-  });
+  res.json({ status: 'ok', timestamp: new Date().toISOString() });
 });
 
-app.use('/api/admin', adminRoutes);
-app.use('/api/content', contentRoutes);
-app.use('/api/categories', categoriesRoutes);
-app.use('/api/galleries', galleriesRoutes);
-app.use('/api/contact', contactRoutes);
-app.use('/api/settings', settingsRoutes);
-const bootstrapRouter = require('./routes/bootstrap');
-app.use('/api/bootstrap', bootstrapRouter);
-app.use('/api/upload', uploadRoutes);
+app.use('/api/admin', require('./routes/admin'));
+app.use('/api/content', require('./routes/content'));
+app.use('/api/categories', require('./routes/categories'));
+app.use('/api/galleries', require('./routes/galleries'));
+app.use('/api/contact', require('./routes/contact'));
+app.use('/api/settings', require('./routes/settings'));
+app.use('/api/bootstrap', require('./routes/bootstrap'));
+app.use('/api/upload', require('./routes/upload'));
 
 app.use((err, req, res, next) => {
   console.error(err.stack);
@@ -48,23 +33,18 @@ const PORT = process.env.PORT || 5000;
 
 const startServer = async () => {
   try {
+    const dbConnect = require('./config/db');
     await dbConnect();
-    
-    if (process.env.VERCEL) {
-      module.exports = app;
-    } else {
-      app.listen(PORT, () => {
-        console.log(`Server running on port ${PORT}`);
-        console.log(`API available at http://localhost:${PORT}/api`);
-      });
-    }
   } catch (error) {
-    console.error('Failed to start server:', error);
-    if (process.env.VERCEL) {
-      module.exports = app;
-    } else {
-      process.exit(1);
-    }
+    console.log('DB connection skipped or failed:', error.message);
+  }
+  
+  if (process.env.VERCEL) {
+    module.exports = app;
+  } else {
+    app.listen(PORT, () => {
+      console.log(`Server running on port ${PORT}`);
+    });
   }
 };
 
