@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { motion } from 'framer-motion';
-import { Images, MessageSquare, FolderOpen, TrendingUp } from 'lucide-react';
+import { Image, MessageSquare, FolderOpen, TrendingUp } from 'lucide-react';
 import { api } from '@/lib/api';
 
 interface Stats {
@@ -48,7 +48,7 @@ export default function DashboardPage() {
   }, []);
   
   const statCards = [
-    { label: 'Galerías', value: stats.galleries, icon: Images, href: '/admin/galleries', color: 'bg-voragine-accent' },
+    { label: 'Galerías', value: stats.galleries, icon: Image, href: '/admin/galleries', color: 'bg-voragine-accent' },
     { label: 'Categorías', value: stats.categories, icon: FolderOpen, href: '/admin/galleries', color: 'bg-voragine-black' },
     { label: 'Mensajes nuevos', value: stats.unreadMessages, icon: MessageSquare, href: '/admin/messages', color: 'bg-green-500' },
   ];

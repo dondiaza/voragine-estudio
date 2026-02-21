@@ -34,7 +34,7 @@ router.get('/', auth, async (req, res) => {
     let query = {};
     
     if (unread === 'true') query.read = false;
-    if (archored !== 'true') query.archived = false;
+    if (archived !== 'true') query.archived = false;
     
     const messages = await Message.find(query)
       .sort({ createdAt: -1 })

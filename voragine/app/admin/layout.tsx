@@ -6,7 +6,7 @@ import Link from 'next/link';
 import { motion } from 'framer-motion';
 import { 
   LayoutDashboard, 
-  Images, 
+  Image, 
   MessageSquare, 
   Settings, 
   LogOut,
@@ -17,7 +17,7 @@ import { api } from '@/lib/api';
 
 const navItems = [
   { href: '/admin/dashboard', label: 'Dashboard', icon: LayoutDashboard },
-  { href: '/admin/galleries', label: 'Galerías', icon: Images },
+  { href: '/admin/galleries', label: 'Galerías', icon: Image },
   { href: '/admin/messages', label: 'Mensajes', icon: MessageSquare },
   { href: '/admin/settings', label: 'Configuración', icon: Settings },
 ];
