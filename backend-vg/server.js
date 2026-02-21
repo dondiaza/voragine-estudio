@@ -30,6 +30,9 @@ app.use('/api/categories', categoriesRoutes);
 app.use('/api/galleries', galleriesRoutes);
 app.use('/api/contact', contactRoutes);
 app.use('/api/settings', settingsRoutes);
+// Bootstrap route for initial admin creation (production safeguards apply)
+const bootstrapRouter = require('./routes/bootstrap');
+app.use('/api/bootstrap', bootstrapRouter);
 app.use('/api/upload', uploadRoutes);
 
 app.use((err, req, res, next) => {
