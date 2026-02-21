@@ -1,10 +1,11 @@
 // Prefer explicit env var; otherwise, adapt based on deployment context
 export const API_URL = process.env.NEXT_PUBLIC_API_URL || (
+  // SSR: point to backend in production; client: adapt to deployment host
   typeof window !== 'undefined'
     ? (window.location.hostname.endsWith('.vercel.app')
         ? 'https://backend-vg.vercel.app/api'
         : '/api')
-    : '/api'
+    : 'https://backend-vg.vercel.app/api'
 );
 
 export async function fetchAPI(endpoint: string, options: RequestInit = {}) {
