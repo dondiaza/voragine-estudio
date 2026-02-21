@@ -2,6 +2,7 @@ require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
 const path = require('path');
+const mongoose = require('mongoose');
 const dbConnect = require('./config/db');
 
 const adminRoutes = require('./routes/admin');
@@ -21,7 +22,11 @@ app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
 app.get('/api/health', (req, res) => {
-  res.json({ status: 'ok', timestamp: new Date().toISOString() });
+  res.json({ 
+    status: 'ok', 
+    timestamp: new Date().toISOString(),
+    database: mongoose.connection.readyState === 1 ? 'connected' : 'disconnected'
+  });
 });
 
 app.use('/api/admin', adminRoutes);
@@ -30,7 +35,6 @@ app.use('/api/categories', categoriesRoutes);
 app.use('/api/galleries', galleriesRoutes);
 app.use('/api/contact', contactRoutes);
 app.use('/api/settings', settingsRoutes);
-// Bootstrap route for initial admin creation (production safeguards apply)
 const bootstrapRouter = require('./routes/bootstrap');
 app.use('/api/bootstrap', bootstrapRouter);
 app.use('/api/upload', uploadRoutes);
@@ -45,13 +49,22 @@ const PORT = process.env.PORT || 5000;
 const startServer = async () => {
   try {
     await dbConnect();
-    app.listen(PORT, () => {
-      console.log(`Server running on port ${PORT}`);
-      console.log(`API available at http://localhost:${PORT}/api`);
-    });
+    
+    if (process.env.VERCEL) {
+      module.exports = app;
+    } else {
+      app.listen(PORT, () => {
+        console.log(`Server running on port ${PORT}`);
+        console.log(`API available at http://localhost:${PORT}/api`);
+      });
+    }
   } catch (error) {
     console.error('Failed to start server:', error);
-    process.exit(1);
+    if (process.env.VERCEL) {
+      module.exports = app;
+    } else {
+      process.exit(1);
+    }
   }
 };
 

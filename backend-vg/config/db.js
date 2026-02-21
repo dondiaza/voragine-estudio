@@ -1,14 +1,32 @@
 const mongoose = require('mongoose');
 
+let isConnected = false;
+
 const dbConnect = async () => {
+  const mongoUri = process.env.MONGODB_URI;
+  
+  if (!mongoUri) {
+    console.log('MONGODB_URI not set, running without database');
+    return false;
+  }
+  
+  if (isConnected) {
+    console.log('Already connected to MongoDB');
+    return true;
+  }
+  
   try {
-    const conn = await mongoose.connect(process.env.MONGODB_URI, {
-      serverSelectionTimeoutMS: 5000
+    const conn = await mongoose.connect(mongoUri, {
+      serverSelectionTimeoutMS: 5000,
+      socketTimeoutMS: 45000,
     });
+    isConnected = true;
     console.log(`MongoDB Connected: ${conn.connection.host}`);
+    return true;
   } catch (error) {
     console.error('MongoDB connection error:', error.message);
-    process.exit(1);
+    console.log('Running in demo mode without database');
+    return false;
   }
 };
 
