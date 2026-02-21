@@ -16,5 +16,9 @@ app.use('/api/admin', require('./routes/admin'));
 app.use('/api/content', require('./routes/content'));
 app.use('/api/categories', require('./routes/categories'));
 app.use('/api/galleries', require('./routes/galleries'));
+app.use('/api/contact', require('./routes/contact'));
+app.use('/api/settings', require('./routes/settings'));
+app.use('/api/bootstrap', require('./routes/bootstrap'));
+app.use('/api/upload', require('./routes/upload'));
 
 module.exports = app;
