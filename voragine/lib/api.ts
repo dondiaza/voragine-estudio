@@ -1,4 +1,11 @@
-export const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api';
+// Prefer explicit env var; otherwise, adapt based on deployment context
+export const API_URL = process.env.NEXT_PUBLIC_API_URL || (
+  typeof window !== 'undefined'
+    ? (window.location.hostname.endsWith('.vercel.app')
+        ? 'https://backend-vg.vercel.app/api'
+        : '/api')
+    : '/api'
+);
 
 export async function fetchAPI(endpoint: string, options: RequestInit = {}) {
   const url = `${API_URL}${endpoint}`;
@@ -60,8 +67,8 @@ export const api = {
   
   contact: {
     send: (data: unknown) => fetchAPI('/contact', { method: 'POST', body: JSON.stringify(data) }),
-    getAll: (params?: { unread?: boolean; archived?: boolean }) => {
-      const query = new URLSearchParams(params as Record<string, string>).toString();
+    getAll: (params?: { unread?: string; archived?: string }) => {
+      const query = params ? new URLSearchParams(params as Record<string, string>).toString() : '';
       return fetchAPI(`/contact${query ? `?${query}` : ''}`);
     },
     getById: (id: string) => fetchAPI(`/contact/${id}`),
