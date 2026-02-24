@@ -9,6 +9,7 @@ const rateLimit = require('express-rate-limit');
 const dbConnect = require('./config/db');
 const sanitizeInputs = require('./middleware/sanitize');
 const uploadMiddleware = require('./middleware/upload');
+const { fallbackHandler } = require('./fallback/api');
 
 const adminRoutes = require('./routes/admin');
 const categoryRoutes = require('./routes/categories');
@@ -85,23 +86,6 @@ app.use('/uploads', express.static(uploadMiddleware.uploadDir || path.join(__dir
   maxAge: '7d'
 }));
 
-const requireDatabase = async (_req, res, next) => {
-  try {
-    const connected = await dbConnect();
-    if (!connected) {
-      return res.status(503).json({
-        error: 'Database unavailable. Configure MONGODB_URI to use the CMS.'
-      });
-    }
-    return next();
-  } catch (error) {
-    console.error('db.middleware', error);
-    return res.status(503).json({
-      error: 'Database unavailable. Configure MONGODB_URI to use the CMS.'
-    });
-  }
-};
-
 app.get('/api/health', async (_req, res) => {
   const connected = await dbConnect();
   res.json({
@@ -111,7 +95,29 @@ app.get('/api/health', async (_req, res) => {
   });
 });
 
-app.use('/api', requireDatabase);
+app.use('/api', async (req, res, next) => {
+  if (req.path === '/health') {
+    return next();
+  }
+
+  const connected = await dbConnect();
+  if (connected) {
+    return next();
+  }
+
+  if (req.path.startsWith('/upload')) {
+    return next();
+  }
+
+  const handled = fallbackHandler(req, res);
+  if (handled) {
+    return;
+  }
+
+  return res.status(503).json({
+    error: 'Database unavailable. Configure MONGODB_URI to use the full persistent CMS.'
+  });
+});
 
 app.use('/api/public', publicRoutes);
 app.use('/api/admin', authLimiter, adminRoutes);
