@@ -43,8 +43,14 @@ export default function AdminLayout({
   const pathname = usePathname();
   const [isLoading, setIsLoading] = useState(true);
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const isLoginPage = pathname === '/admin/login';
   
   useEffect(() => {
+    if (isLoginPage) {
+      setIsLoading(false);
+      return;
+    }
+
     const checkAuth = async () => {
       const token = localStorage.getItem('token');
       if (!token) {
@@ -62,7 +68,7 @@ export default function AdminLayout({
     };
     
     checkAuth();
-  }, [router]);
+  }, [isLoginPage, router]);
   
   const handleLogout = () => {
     localStorage.removeItem('token');
@@ -75,6 +81,10 @@ export default function AdminLayout({
         <div className="animate-spin w-8 h-8 border-2 border-voragine-black border-t-transparent rounded-full" />
       </div>
     );
+  }
+
+  if (isLoginPage) {
+    return <>{children}</>;
   }
   
   return (
