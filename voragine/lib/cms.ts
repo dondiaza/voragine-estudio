@@ -162,6 +162,40 @@ export type SiteSettings = {
   };
 };
 
+export type LegacyContent = {
+  hero?: {
+    title?: string;
+    subtitle?: string;
+    cta?: string;
+    heroImage?: string;
+  };
+  services?: {
+    title?: string;
+    subtitle?: string;
+    items?: Array<{
+      id?: string;
+      title?: string;
+      description?: string;
+      image?: string;
+    }>;
+  };
+  about?: {
+    title?: string;
+    subtitle?: string;
+    items?: Array<{ title?: string; description?: string }>;
+  };
+  process?: {
+    title?: string;
+    subtitle?: string;
+    steps?: Array<{ number?: string; title?: string; description?: string }>;
+  };
+  cta?: {
+    title?: string;
+    subtitle?: string;
+    button?: string;
+  };
+};
+
 const isAbsoluteUrl = (value: string) => /^https?:\/\//i.test(value);
 
 export const resolveMediaUrl = (value?: string | null): string => {
@@ -268,4 +302,8 @@ export const getPosts = cache(async (limit?: number) =>
 
 export const getPostBySlug = cache(async (slug: string) =>
   fetchSafe<Post | null>(`/posts/${slug}`, null)
+);
+
+export const getLegacyContent = cache(async () =>
+  fetchSafe<LegacyContent>('/content', {})
 );

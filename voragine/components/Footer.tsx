@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { motion } from 'framer-motion';
 import { Instagram, Facebook, Mail } from 'lucide-react';
+import type { SiteSettings } from '@/lib/cms';
 
 const footerLinks = [
   { href: '#que-hacemos', label: 'Qué hacemos' },
@@ -11,8 +12,17 @@ const footerLinks = [
   { href: '#contacto', label: 'Contacto' },
 ];
 
-export default function Footer() {
+interface FooterProps {
+  settings?: SiteSettings | null;
+}
+
+export default function Footer({ settings }: FooterProps) {
   const currentYear = new Date().getFullYear();
+  const siteName = settings?.siteName || 'Vorágine Estudio';
+  const tagline = settings?.tagline || 'Capturamos instantes que no vuelven. Fotografía artística para momentos únicos que merecen ser recordados.';
+  const email = settings?.email || 'info@voragineestudio.com';
+  const instagram = settings?.social?.instagram || 'https://instagram.com/voragineestudio';
+  const facebook = settings?.social?.facebook || 'https://facebook.com/voragineestudio';
   
   return (
     <footer className="bg-voragine-black text-white py-16 md:py-24">
@@ -25,10 +35,9 @@ export default function Footer() {
               viewport={{ once: true }}
               transition={{ duration: 0.6 }}
             >
-              <h3 className="font-serif text-3xl mb-4">Vorágine Estudio</h3>
+              <h3 className="font-serif text-3xl mb-4">{siteName}</h3>
               <p className="text-white/60 text-sm leading-relaxed max-w-xs">
-                Capturamos instantes que no vuelven. Fotografía artística 
-                para momentos únicos que merecen ser recordados.
+                {tagline}
               </p>
             </motion.div>
           </div>
@@ -66,15 +75,15 @@ export default function Footer() {
               <h4 className="label text-white/40 mb-6">Contacto</h4>
               <div className="space-y-3">
                 <a
-                  href="mailto:info@voragineestudio.com"
+                  href={`mailto:${email}`}
                   className="flex items-center gap-3 text-white/70 hover:text-white transition-colors text-sm"
                 >
                   <Mail size={16} />
-                  info@voragineestudio.com
+                  {email}
                 </a>
                 <div className="flex items-center gap-4 pt-4">
                   <a
-                    href="https://instagram.com/voragineestudio"
+                    href={instagram}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="text-white/70 hover:text-white transition-colors"
@@ -83,7 +92,7 @@ export default function Footer() {
                     <Instagram size={20} />
                   </a>
                   <a
-                    href="https://facebook.com/voragineestudio"
+                    href={facebook}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="text-white/70 hover:text-white transition-colors"
@@ -105,7 +114,7 @@ export default function Footer() {
           className="mt-16 pt-8 border-t border-white/10 flex flex-col md:flex-row justify-between items-center gap-4"
         >
           <p className="text-white/40 text-xs">
-            © {currentYear} Vorágine Estudio. Todos los derechos reservados.
+            © {currentYear} {siteName}. Todos los derechos reservados.
           </p>
           <p className="text-white/30 text-xs">
             Diseño y desarrollo con sensibilidad artística

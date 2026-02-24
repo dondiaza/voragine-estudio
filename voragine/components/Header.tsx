@@ -13,7 +13,11 @@ const navLinks = [
   { href: '#contacto', label: 'Contacto' },
 ];
 
-export default function Header() {
+interface HeaderProps {
+  siteName?: string;
+}
+
+export default function Header({ siteName = 'Vorágine' }: HeaderProps) {
   const [isOpen, setIsOpen] = useState(false);
   const scrollY = useScrollPosition();
   const isScrolled = scrollY > 50;
@@ -41,7 +45,7 @@ export default function Header() {
               transition={{ duration: 0.6 }}
               className="font-serif text-2xl md:text-3xl tracking-tight"
             >
-              Vorágine
+              {siteName}
             </motion.div>
           </Link>
           

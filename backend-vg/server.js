@@ -85,34 +85,28 @@ app.use('/uploads', express.static(uploadMiddleware.uploadDir || path.join(__dir
   maxAge: '7d'
 }));
 
-let dbReady = false;
-dbConnect()
-  .then((connected) => {
-    dbReady = connected;
-  })
-  .catch((error) => {
-    console.error('db.connect', error);
-    dbReady = false;
-  });
-
-const requireDatabase = (req, res, next) => {
-  if (req.path === '/health') {
+const requireDatabase = async (_req, res, next) => {
+  try {
+    const connected = await dbConnect();
+    if (!connected) {
+      return res.status(503).json({
+        error: 'Database unavailable. Configure MONGODB_URI to use the CMS.'
+      });
+    }
     return next();
-  }
-
-  if (!dbReady) {
+  } catch (error) {
+    console.error('db.middleware', error);
     return res.status(503).json({
       error: 'Database unavailable. Configure MONGODB_URI to use the CMS.'
     });
   }
-
-  return next();
 };
 
-app.get('/api/health', (_req, res) => {
+app.get('/api/health', async (_req, res) => {
+  const connected = await dbConnect();
   res.json({
     status: 'ok',
-    database: dbReady ? 'connected' : 'disconnected',
+    database: connected ? 'connected' : 'disconnected',
     timestamp: new Date().toISOString()
   });
 });
