@@ -24,6 +24,7 @@ Revisa `.env.example`. Claves críticas:
 - `REVALIDATE_WEBHOOK_URL`
 - `REVALIDATE_WEBHOOK_TOKEN`
 - SMTP (`SMTP_HOST`, `SMTP_USER`, `SMTP_PASS`, `SMTP_FROM`)
+- `BLOB_READ_WRITE_TOKEN` (persistencia fallback + uploads en serverless)
 
 ## Comandos
 
@@ -56,6 +57,13 @@ npm start
 - Sanitización de inputs
 - Auth JWT
 - Roles/permisos por endpoint
+
+## Persistencia sin Mongo
+
+Si `MONGODB_URI` no está disponible, el backend entra en fallback y persiste datos CMS
+(`servicios`, `proyectos`, `páginas`, `mensajes`, usuarios fallback, etc.) en Vercel Blob (`FALLBACK_STATE_PATH`).
+El estado se cifra con `FALLBACK_STATE_SECRET` (o `JWT_SECRET`) antes de guardarse en Blob.
+Los uploads también se guardan en Blob cuando existe `BLOB_READ_WRITE_TOKEN`.
 
 ## Revalidación front
 

@@ -1,18 +1,74 @@
+const crypto = require('crypto');
+const { list, put } = require('@vercel/blob');
+
 const DEMO_TOKEN = 'demo-token-12345';
+const FALLBACK_STATE_PATH = process.env.FALLBACK_STATE_PATH || 'voragine/fallback-state.json';
+const FALLBACK_STATE_PREFIX = (() => {
+  if (FALLBACK_STATE_PATH.endsWith('/')) return FALLBACK_STATE_PATH;
+  if (FALLBACK_STATE_PATH.endsWith('.json')) return `${FALLBACK_STATE_PATH.replace(/\.json$/i, '')}/`;
+  return `${FALLBACK_STATE_PATH}/`;
+})();
+const FALLBACK_ADMIN_USERNAME = (process.env.FALLBACK_ADMIN_USERNAME || 'admin').trim();
+const FALLBACK_ADMIN_PASSWORD = (process.env.FALLBACK_ADMIN_PASSWORD || 'admin12345').trim();
+const FALLBACK_ADMIN_EMAIL = (process.env.FALLBACK_ADMIN_EMAIL || 'admin@voragineestudio.com').trim();
+const FALLBACK_ADMIN_NAME = (process.env.FALLBACK_ADMIN_NAME || 'Administrador').trim();
+const FALLBACK_STATE_SECRET = (process.env.FALLBACK_STATE_SECRET || process.env.JWT_SECRET || 'fallback-state-secret').trim();
 
 let idSeq = 1000;
 const nextId = () => String(++idSeq);
 
 const nowIso = () => new Date().toISOString();
+const isObject = (value) => value && typeof value === 'object' && !Array.isArray(value);
+const getBlobToken = () => (process.env.BLOB_READ_WRITE_TOKEN || '').trim();
+const getStateCipherKey = () => crypto.createHash('sha256').update(FALLBACK_STATE_SECRET).digest();
 
-const state = {
+const encryptStatePayload = (plainText) => {
+  const iv = crypto.randomBytes(12);
+  const cipher = crypto.createCipheriv('aes-256-gcm', getStateCipherKey(), iv);
+  const encrypted = Buffer.concat([cipher.update(plainText, 'utf8'), cipher.final()]);
+  const tag = cipher.getAuthTag();
+
+  return JSON.stringify({
+    v: 1,
+    iv: iv.toString('base64'),
+    tag: tag.toString('base64'),
+    data: encrypted.toString('base64')
+  });
+};
+
+const decryptStatePayload = (cipherText) => {
+  if (!cipherText) return '';
+
+  try {
+    const payload = JSON.parse(cipherText);
+    if (payload && payload.v === 1 && payload.iv && payload.tag && payload.data) {
+      const decipher = crypto.createDecipheriv(
+        'aes-256-gcm',
+        getStateCipherKey(),
+        Buffer.from(payload.iv, 'base64')
+      );
+      decipher.setAuthTag(Buffer.from(payload.tag, 'base64'));
+      const decrypted = Buffer.concat([
+        decipher.update(Buffer.from(payload.data, 'base64')),
+        decipher.final()
+      ]);
+      return decrypted.toString('utf8');
+    }
+  } catch (_error) {
+    // Backward compatibility for plain JSON payloads.
+  }
+
+  return cipherText;
+};
+
+const createInitialState = () => ({
   admins: [
     {
       _id: '1',
-      username: 'admin',
-      password: 'admin12345',
-      email: 'admin@voragineestudio.com',
-      name: 'Administrador',
+      username: FALLBACK_ADMIN_USERNAME,
+      password: FALLBACK_ADMIN_PASSWORD,
+      email: FALLBACK_ADMIN_EMAIL,
+      name: FALLBACK_ADMIN_NAME,
       role: 'admin',
       active: true,
       createdAt: nowIso()
@@ -184,6 +240,198 @@ const state = {
       openingHours: ['Mon-Fri 10:00-19:00']
     }
   }
+});
+
+const ensureFallbackAdmin = (admins) => {
+  const list = Array.isArray(admins) ? admins.filter(isObject) : [];
+  const key = FALLBACK_ADMIN_USERNAME.toLowerCase();
+  const existing = list.find((admin) => String(admin.username || '').toLowerCase() === key);
+
+  if (existing) {
+    existing.active = existing.active !== false;
+    existing.role = existing.role || 'admin';
+    existing.name = existing.name || FALLBACK_ADMIN_NAME;
+    existing.email = existing.email || FALLBACK_ADMIN_EMAIL;
+    return list;
+  }
+
+  list.unshift({
+    _id: '1',
+    username: FALLBACK_ADMIN_USERNAME,
+    password: FALLBACK_ADMIN_PASSWORD,
+    email: FALLBACK_ADMIN_EMAIL,
+    name: FALLBACK_ADMIN_NAME,
+    role: 'admin',
+    active: true,
+    createdAt: nowIso()
+  });
+
+  return list;
+};
+
+const mergeState = (candidate) => {
+  const base = createInitialState();
+  if (!isObject(candidate)) {
+    return base;
+  }
+
+  const mergedSettings = isObject(candidate.settings) ? candidate.settings : {};
+  return {
+    ...base,
+    ...candidate,
+    admins: ensureFallbackAdmin(candidate.admins ?? base.admins),
+    categories: Array.isArray(candidate.categories) ? candidate.categories : base.categories,
+    services: Array.isArray(candidate.services) ? candidate.services : base.services,
+    projects: Array.isArray(candidate.projects) ? candidate.projects : base.projects,
+    pages: Array.isArray(candidate.pages) ? candidate.pages : base.pages,
+    posts: Array.isArray(candidate.posts) ? candidate.posts : base.posts,
+    testimonials: Array.isArray(candidate.testimonials) ? candidate.testimonials : base.testimonials,
+    messages: Array.isArray(candidate.messages) ? candidate.messages : base.messages,
+    content: isObject(candidate.content) ? candidate.content : base.content,
+    settings: {
+      ...base.settings,
+      ...mergedSettings,
+      social: { ...base.settings.social, ...(isObject(mergedSettings.social) ? mergedSettings.social : {}) },
+      branding: { ...base.settings.branding, ...(isObject(mergedSettings.branding) ? mergedSettings.branding : {}) },
+      ctas: { ...base.settings.ctas, ...(isObject(mergedSettings.ctas) ? mergedSettings.ctas : {}) },
+      seo: { ...base.settings.seo, ...(isObject(mergedSettings.seo) ? mergedSettings.seo : {}) },
+      business: { ...base.settings.business, ...(isObject(mergedSettings.business) ? mergedSettings.business : {}) }
+    }
+  };
+};
+
+const computeMaxId = (value) => {
+  let max = 0;
+  const stack = [value];
+
+  while (stack.length) {
+    const current = stack.pop();
+    if (Array.isArray(current)) {
+      for (const item of current) stack.push(item);
+      continue;
+    }
+    if (!isObject(current)) {
+      continue;
+    }
+    if (typeof current._id === 'string' && /^\d+$/.test(current._id)) {
+      max = Math.max(max, Number(current._id));
+    }
+    for (const nested of Object.values(current)) {
+      stack.push(nested);
+    }
+  }
+
+  return max;
+};
+
+let state = mergeState(createInitialState());
+let stateSynced = false;
+let syncInFlight = null;
+let persistQueue = Promise.resolve();
+idSeq = Math.max(1000, computeMaxId(state));
+
+const persistStateNow = async () => {
+  const token = getBlobToken();
+  if (!token) return;
+
+  const serialized = JSON.stringify(state);
+  const encrypted = encryptStatePayload(serialized);
+  const statePathname = `${FALLBACK_STATE_PREFIX}${Date.now()}-${Math.round(Math.random() * 1e9)}.json`;
+  await put(statePathname, encrypted, {
+    access: 'public',
+    token,
+    addRandomSuffix: false,
+    allowOverwrite: false,
+    contentType: 'application/octet-stream',
+    cacheControlMaxAge: 60
+  });
+};
+
+const queueStatePersist = () => {
+  const token = getBlobToken();
+  if (!token) return Promise.resolve();
+
+  persistQueue = persistQueue
+    .catch(() => undefined)
+    .then(() => persistStateNow());
+  return persistQueue;
+};
+
+const syncStateFromBlob = async () => {
+  const token = getBlobToken();
+  if (!token) {
+    stateSynced = true;
+    idSeq = Math.max(1000, computeMaxId(state));
+    return;
+  }
+
+  if (syncInFlight) {
+    await syncInFlight;
+    return;
+  }
+
+  syncInFlight = (async () => {
+    try {
+      let listed = await list({
+        token,
+        prefix: FALLBACK_STATE_PREFIX,
+        limit: 25
+      });
+      let candidates = listed.blobs || [];
+
+      if (candidates.length === 0) {
+        listed = await list({
+          token,
+          prefix: FALLBACK_STATE_PATH,
+          limit: 1
+        });
+        candidates = (listed.blobs || []).filter((blob) => blob.pathname === FALLBACK_STATE_PATH);
+      }
+
+      const latest = candidates
+        .slice()
+        .sort((a, b) => new Date(b.uploadedAt).getTime() - new Date(a.uploadedAt).getTime())[0];
+      const blobUrl = latest?.url || null;
+
+      if (!blobUrl) {
+        state = mergeState(createInitialState());
+        await persistStateNow();
+        stateSynced = true;
+        idSeq = Math.max(1000, computeMaxId(state));
+        return;
+      }
+
+      const response = await fetch(blobUrl, { cache: 'no-store' });
+      if (!response.ok) {
+        if (response.status === 404) {
+          state = mergeState(createInitialState());
+          await persistStateNow();
+          stateSynced = true;
+          idSeq = Math.max(1000, computeMaxId(state));
+          return;
+        }
+        throw new Error(`Blob fetch failed (${response.status})`);
+      }
+
+      const text = await response.text();
+      const plainText = decryptStatePayload(text);
+      const parsed = plainText ? JSON.parse(plainText) : {};
+      state = mergeState(parsed);
+      stateSynced = true;
+      idSeq = Math.max(1000, computeMaxId(state));
+    } catch (error) {
+      console.log('fallback.state.sync.error', error instanceof Error ? error.message : error);
+      if (!stateSynced) {
+        state = mergeState(state);
+        stateSynced = true;
+        idSeq = Math.max(1000, computeMaxId(state));
+      }
+    } finally {
+      syncInFlight = null;
+    }
+  })();
+
+  await syncInFlight;
 };
 
 const normalizeBoolean = (value, fallback = false) => {
@@ -202,7 +450,13 @@ const withoutPassword = (admin) => {
 const getAuthUser = (req) => {
   const token = req.header('authorization')?.replace('Bearer ', '');
   if (token !== DEMO_TOKEN) return null;
-  return state.admins.find((admin) => admin._id === '1') || null;
+
+  const adminKey = FALLBACK_ADMIN_USERNAME.toLowerCase();
+  return (
+    state.admins.find((admin) => String(admin.username || '').toLowerCase() === adminKey) ||
+    state.admins.find((admin) => admin.role === 'admin' && admin.active !== false) ||
+    null
+  );
 };
 
 const requireAuth = (req, res) => {
@@ -224,16 +478,19 @@ const requireAdmin = (req, res) => {
   return user;
 };
 
-const withCategoryObject = (project) => ({
-  ...project,
-  category: state.categories.find((cat) => cat._id === project.category)
-    ? {
-      _id: state.categories.find((cat) => cat._id === project.category)._id,
-      name: state.categories.find((cat) => cat._id === project.category).name,
-      slug: state.categories.find((cat) => cat._id === project.category).slug
-    }
-    : null
-});
+const withCategoryObject = (project) => {
+  const category = state.categories.find((cat) => cat._id === project.category);
+  return {
+    ...project,
+    category: category
+      ? {
+        _id: category._id,
+        name: category.name,
+        slug: category.slug
+      }
+      : null
+  };
+};
 
 const parseSegments = (path) => path.split('/').filter(Boolean);
 
@@ -259,14 +516,33 @@ const deleteById = (collection, id) => {
 
 const json = (res, status, payload) => res.status(status).json(payload);
 
-const fallbackHandler = (req, res) => {
+const fallbackHandler = async (req, res) => {
+  await syncStateFromBlob();
+
+  const persistResponse = async (status, payload) => {
+    try {
+      await queueStatePersist();
+      return json(res, status, payload);
+    } catch (error) {
+      console.log('fallback.state.persist.error', error instanceof Error ? error.message : error);
+      return json(res, 503, { error: 'Persistence error (fallback mode)' });
+    }
+  };
+
   const segments = parseSegments(req.path);
   const [resource, id, subresource, subId] = segments;
   const method = req.method.toUpperCase();
 
   if (resource === 'admin' && id === 'login' && method === 'POST') {
     const { username, password } = req.body || {};
-    const user = state.admins.find((admin) => admin.username === username && admin.password === password && admin.active !== false);
+    const loginKey = String(username || '').trim().toLowerCase();
+    const user = state.admins.find((admin) => {
+      const userName = String(admin.username || '').trim().toLowerCase();
+      const userEmail = String(admin.email || '').trim().toLowerCase();
+      const matchIdentity = loginKey === userName || loginKey === userEmail;
+      return matchIdentity && admin.password === password && admin.active !== false;
+    });
+
     if (!user) return json(res, 401, { error: 'Invalid credentials' });
     return json(res, 200, { token: DEMO_TOKEN, admin: withoutPassword(user), fallback: true });
   }
@@ -295,14 +571,14 @@ const fallbackHandler = (req, res) => {
       active: payload.active !== false
     };
     state.admins.push(user);
-    return json(res, 201, withoutPassword(user));
+    return persistResponse(201, withoutPassword(user));
   }
 
   if (resource === 'admin' && id === 'users' && subresource && method === 'PUT') {
     if (!requireAdmin(req, res)) return true;
     const updated = upsertById(state.admins, subresource, req.body || {});
     if (!updated) return json(res, 404, { error: 'User not found' });
-    return json(res, 200, withoutPassword(updated));
+    return persistResponse(200, withoutPassword(updated));
   }
 
   if (resource === 'public' && id === 'bootstrap' && method === 'GET') {
@@ -322,7 +598,7 @@ const fallbackHandler = (req, res) => {
     if (method === 'PUT') {
       if (!requireAuth(req, res)) return true;
       state.settings = { ...state.settings, ...(req.body || {}) };
-      return json(res, 200, state.settings);
+      return persistResponse(200, state.settings);
     }
   }
 
@@ -334,7 +610,7 @@ const fallbackHandler = (req, res) => {
     if (method === 'PUT' && id) {
       if (!requireAuth(req, res)) return true;
       state.content[id] = (req.body || {}).data || {};
-      return json(res, 200, { section: id, data: state.content[id] });
+      return persistResponse(200, { section: id, data: state.content[id] });
     }
   }
 
@@ -372,20 +648,20 @@ const fallbackHandler = (req, res) => {
       const item = { ...payload, _id: nextId() };
       if (!item.slug && item.title) item.slug = item.title.toLowerCase().replace(/\s+/g, '-');
       collection.push(item);
-      return json(res, 201, item);
+      return persistResponse(201, item);
     }
 
     if (method === 'PUT' && id) {
       if (!requireAuth(req, res)) return true;
       const updated = upsertById(collection, id, req.body || {});
       if (!updated) return json(res, 404, { error: 'Not found' });
-      return json(res, 200, updated);
+      return persistResponse(200, updated);
     }
 
     if (method === 'DELETE' && id) {
       if (!requireAdmin(req, res)) return true;
       if (!deleteById(collection, id)) return json(res, 404, { error: 'Not found' });
-      return json(res, 200, { message: 'Deleted' });
+      return persistResponse(200, { message: 'Deleted' });
     }
   }
 
@@ -418,20 +694,20 @@ const fallbackHandler = (req, res) => {
         createdAt: nowIso()
       };
       state.projects.push(project);
-      return json(res, 201, withCategoryObject(project));
+      return persistResponse(201, withCategoryObject(project));
     }
 
     if (method === 'PUT' && id && !subresource) {
       if (!requireAuth(req, res)) return true;
       const updated = upsertById(state.projects, id, req.body || {});
       if (!updated) return json(res, 404, { error: 'Project not found' });
-      return json(res, 200, withCategoryObject(updated));
+      return persistResponse(200, withCategoryObject(updated));
     }
 
     if (method === 'DELETE' && id && !subresource) {
       if (!requireAdmin(req, res)) return true;
       if (!deleteById(state.projects, id)) return json(res, 404, { error: 'Project not found' });
-      return json(res, 200, { message: 'Project deleted' });
+      return persistResponse(200, { message: 'Project deleted' });
     }
 
     if (subresource === 'images' && method === 'POST') {
@@ -439,7 +715,7 @@ const fallbackHandler = (req, res) => {
       const project = findById(state.projects, id);
       if (!project) return json(res, 404, { error: 'Project not found' });
       project.images = [...(project.images || []), ...((req.body || {}).images || [])];
-      return json(res, 200, withCategoryObject(project));
+      return persistResponse(200, withCategoryObject(project));
     }
 
     if (subresource === 'images' && subId && method === 'DELETE') {
@@ -447,7 +723,7 @@ const fallbackHandler = (req, res) => {
       const project = findById(state.projects, id);
       if (!project) return json(res, 404, { error: 'Project not found' });
       project.images = (project.images || []).filter((image) => String(image._id || image.url) !== subId);
-      return json(res, 200, withCategoryObject(project));
+      return persistResponse(200, withCategoryObject(project));
     }
   }
 
@@ -467,7 +743,7 @@ const fallbackHandler = (req, res) => {
         createdAt: nowIso()
       };
       state.messages.unshift(message);
-      return json(res, 201, { message: 'Message sent successfully', id: message._id, fallback: true });
+      return persistResponse(201, { message: 'Message sent successfully', id: message._id, fallback: true });
     }
 
     if (method === 'GET' && !id) {
@@ -485,7 +761,7 @@ const fallbackHandler = (req, res) => {
       const message = findById(state.messages, id);
       if (!message) return json(res, 404, { error: 'Message not found' });
       message.read = true;
-      return json(res, 200, message);
+      return persistResponse(200, message);
     }
 
     if (method === 'PUT' && subresource === 'archive') {
@@ -493,13 +769,13 @@ const fallbackHandler = (req, res) => {
       const message = findById(state.messages, id);
       if (!message) return json(res, 404, { error: 'Message not found' });
       message.archived = true;
-      return json(res, 200, message);
+      return persistResponse(200, message);
     }
 
     if (method === 'DELETE' && id) {
       if (!requireAdmin(req, res)) return true;
       if (!deleteById(state.messages, id)) return json(res, 404, { error: 'Message not found' });
-      return json(res, 200, { message: 'Message deleted' });
+      return persistResponse(200, { message: 'Message deleted' });
     }
   }
 

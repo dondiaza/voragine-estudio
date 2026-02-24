@@ -116,7 +116,7 @@ app.use('/api', async (req, res, next) => {
     return next();
   }
 
-  const handled = fallbackHandler(req, res);
+  const handled = await fallbackHandler(req, res);
   if (handled) {
     return;
   }
