@@ -4,7 +4,6 @@ import { useState } from 'react';
 import { motion } from 'framer-motion';
 import { Send, Loader2, CheckCircle } from 'lucide-react';
 import { useInView } from '@/hooks/useHelpers';
-import { api } from '@/lib/api';
 
 const projectTypes = [
   { value: 'bodas', label: 'Bodas' },
@@ -75,7 +74,18 @@ export default function ContactSection() {
     setIsSubmitting(true);
     
     try {
-      await api.contact.send(formData);
+      const response = await fetch('/contact-submit', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(formData),
+      });
+
+      if (!response.ok) {
+        const payload = await response.json().catch(() => null);
+        const detail = payload?.error || payload?.message || 'No se pudo enviar el mensaje';
+        throw new Error(detail);
+      }
+
       setIsSubmitted(true);
       setFormData({
         name: '',
@@ -84,8 +94,9 @@ export default function ContactSection() {
         projectType: '',
         message: '',
       });
-    } catch {
-      setErrors({ message: 'Error al enviar el mensaje. Inténtalo de nuevo.' });
+    } catch (error) {
+      const detail = error instanceof Error ? error.message : 'Error al enviar el mensaje. Inténtalo de nuevo.';
+      setErrors({ message: detail });
     } finally {
       setIsSubmitting(false);
     }

@@ -1,7 +1,7 @@
 'use client';
 
 import { FormEvent, useMemo, useState } from 'react';
-import { API_URL, toProjectTypeOptions } from '@/lib/api';
+import { toProjectTypeOptions } from '@/lib/api';
 
 type ContactFormProps = {
   defaultProjectType?: string;
@@ -55,21 +55,24 @@ export default function ContactForm({ defaultProjectType = '' }: ContactFormProp
     setSending(true);
 
     try {
-      const response = await fetch(`${API_URL}/contact`, {
+      const response = await fetch('/contact-submit', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(form)
       });
 
       if (!response.ok) {
-        throw new Error('No se pudo enviar el formulario');
+        const payload = await response.json().catch(() => null);
+        const detail = payload?.error || payload?.message || 'No se pudo enviar el formulario';
+        throw new Error(detail);
       }
 
       setForm({ ...initialState, projectType: defaultProjectType });
       setStatus('ok');
-    } catch {
+    } catch (error) {
       setStatus('error');
-      setError('No se pudo enviar el formulario. Inténtalo de nuevo.');
+      const detail = error instanceof Error ? error.message : 'No se pudo enviar el formulario. Inténtalo de nuevo.';
+      setError(detail);
     } finally {
       setSending(false);
     }
