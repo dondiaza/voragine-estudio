@@ -5,6 +5,7 @@ const fs = require('fs');
 const upload = require('../middleware/upload');
 const auth = require('../middleware/auth');
 const requireRole = require('../middleware/role');
+const uploadBaseDir = upload.uploadDir || path.join(__dirname, '../uploads');
 
 const sanitizeFolder = (type) => (type || 'general').replace(/[^a-zA-Z0-9-_]/g, '');
 
@@ -52,7 +53,7 @@ router.delete('/:type/:filename', auth, requireRole(['admin', 'editor']), async 
   try {
     const type = sanitizeFolder(req.params.type);
     const filename = path.basename(req.params.filename);
-    const filePath = path.join(__dirname, '../uploads', type, filename);
+    const filePath = path.join(uploadBaseDir, type, filename);
     
     if (fs.existsSync(filePath)) {
       fs.unlinkSync(filePath);

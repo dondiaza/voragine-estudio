@@ -8,6 +8,7 @@ const rateLimit = require('express-rate-limit');
 
 const dbConnect = require('./config/db');
 const sanitizeInputs = require('./middleware/sanitize');
+const uploadMiddleware = require('./middleware/upload');
 
 const adminRoutes = require('./routes/admin');
 const categoryRoutes = require('./routes/categories');
@@ -80,7 +81,7 @@ app.use(express.urlencoded({ extended: true, limit: '2mb' }));
 app.use(sanitizeInputs);
 app.use(morgan(process.env.NODE_ENV === 'production' ? 'combined' : 'dev'));
 
-app.use('/uploads', express.static(path.join(__dirname, 'uploads'), {
+app.use('/uploads', express.static(uploadMiddleware.uploadDir || path.join(__dirname, 'uploads'), {
   maxAge: '7d'
 }));
 
