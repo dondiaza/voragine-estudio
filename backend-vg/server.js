@@ -86,6 +86,13 @@ app.use('/uploads', express.static(uploadMiddleware.uploadDir || path.join(__dir
   maxAge: '7d'
 }));
 
+app.use('/api', (_req, res, next) => {
+  res.set('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+  res.set('Pragma', 'no-cache');
+  res.set('Expires', '0');
+  next();
+});
+
 app.get('/api/health', async (_req, res) => {
   const connected = await dbConnect();
   res.json({

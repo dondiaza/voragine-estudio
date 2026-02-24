@@ -19,20 +19,39 @@ async function parseError(response: Response) {
 export async function fetchAPI<T = any>(endpoint: string, options: RequestInit = {}): Promise<T> {
   const token = getClientToken();
   const isFormData = options.body instanceof FormData;
+  const method = (options.method || 'GET').toUpperCase();
 
   const headers: Record<string, string> = {
     ...(isFormData ? {} : { 'Content-Type': 'application/json' }),
     ...((options.headers || {}) as Record<string, string>)
   };
 
+  if (method === 'GET' && !headers['Cache-Control']) {
+    headers['Cache-Control'] = 'no-cache';
+  }
+
   if (token) {
     headers.Authorization = `Bearer ${token}`;
   }
 
-  const response = await fetch(`${API_URL}${endpoint}`, {
+  const requestInit: RequestInit = {
     ...options,
-    headers
-  });
+    headers,
+    cache: options.cache ?? 'no-store'
+  };
+
+  let response = await fetch(`${API_URL}${endpoint}`, requestInit);
+
+  // Some browsers may surface conditional API responses as 304 without body.
+  // Retry once with a cache-busting param to guarantee fresh JSON for the CMS.
+  if (response.status === 304) {
+    const sep = endpoint.includes('?') ? '&' : '?';
+    const retryEndpoint = `${endpoint}${sep}_=${Date.now()}`;
+    response = await fetch(`${API_URL}${retryEndpoint}`, {
+      ...requestInit,
+      cache: 'no-store'
+    });
+  }
 
   if (!response.ok) {
     throw new Error(await parseError(response));
@@ -146,7 +165,11 @@ export const api = {
   contact: {
     send: (data: unknown) => fetchAPI('/contact', { method: 'POST', body: JSON.stringify(data) }),
     getAll: (params?: { unread?: string; archived?: string }) => {
-      const query = params ? `?${new URLSearchParams(params as Record<string, string>).toString()}` : '';
+      const searchParams = new URLSearchParams({
+        ...(params as Record<string, string> | undefined),
+        _ts: Date.now().toString()
+      });
+      const query = `?${searchParams.toString()}`;
       return fetchAPI(`/contact${query}`);
     },
     getById: (id: string) => fetchAPI(`/contact/${id}`),
