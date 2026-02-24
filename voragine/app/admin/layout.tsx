@@ -34,6 +34,18 @@ const navItems = [
   { href: '/admin/users', label: 'Usuarios', icon: Users },
 ];
 
+const shouldInvalidateToken = (error: unknown) => {
+  const message = error instanceof Error ? error.message.toLowerCase() : '';
+  return (
+    message.includes('no token provided') ||
+    message.includes('invalid token') ||
+    message.includes('not authenticated') ||
+    message.includes('account not active') ||
+    message.includes('request failed (401)') ||
+    message.includes('request failed (403)')
+  );
+};
+
 export default function AdminLayout({
   children,
 }: {
@@ -61,9 +73,22 @@ export default function AdminLayout({
       try {
         await api.admin.getMe();
         setIsLoading(false);
-      } catch {
-        localStorage.removeItem('token');
-        router.push('/admin/login');
+      } catch (firstError) {
+        // Retry once to avoid logging out on transient network/serverless cold start failures.
+        try {
+          await api.admin.getMe();
+          setIsLoading(false);
+          return;
+        } catch (secondError) {
+          const finalError = secondError || firstError;
+          if (shouldInvalidateToken(finalError)) {
+            localStorage.removeItem('token');
+            router.push('/admin/login');
+            return;
+          }
+          console.error('admin.auth.check', finalError);
+          setIsLoading(false);
+        }
       }
     };
     
