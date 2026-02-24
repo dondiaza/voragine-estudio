@@ -4,14 +4,17 @@ const path = require('path');
 const fs = require('fs');
 const upload = require('../middleware/upload');
 const auth = require('../middleware/auth');
+const requireRole = require('../middleware/role');
 
-router.post('/:type?', auth, upload.single('image'), async (req, res) => {
+const sanitizeFolder = (type) => (type || 'general').replace(/[^a-zA-Z0-9-_]/g, '');
+
+router.post('/:type?', auth, requireRole(['admin', 'editor']), upload.single('image'), async (req, res) => {
   try {
     if (!req.file) {
       return res.status(400).json({ error: 'No file uploaded' });
     }
     
-    const type = req.params.type || 'general';
+    const type = sanitizeFolder(req.params.type);
     const imageUrl = `/uploads/${type}/${req.file.filename}`;
     
     res.json({
@@ -24,13 +27,13 @@ router.post('/:type?', auth, upload.single('image'), async (req, res) => {
   }
 });
 
-router.post('/multiple/:type?', auth, upload.array('images', 20), async (req, res) => {
+router.post('/multiple/:type?', auth, requireRole(['admin', 'editor']), upload.array('images', 20), async (req, res) => {
   try {
     if (!req.files || req.files.length === 0) {
       return res.status(400).json({ error: 'No files uploaded' });
     }
     
-    const type = req.params.type || 'general';
+    const type = sanitizeFolder(req.params.type);
     const urls = req.files.map(file => ({
       url: `/uploads/${type}/${file.filename}`,
       filename: file.filename
@@ -45,9 +48,10 @@ router.post('/multiple/:type?', auth, upload.array('images', 20), async (req, re
   }
 });
 
-router.delete('/:type/:filename', auth, async (req, res) => {
+router.delete('/:type/:filename', auth, requireRole(['admin', 'editor']), async (req, res) => {
   try {
-    const { type, filename } = req.params;
+    const type = sanitizeFolder(req.params.type);
+    const filename = path.basename(req.params.filename);
     const filePath = path.join(__dirname, '../uploads', type, filename);
     
     if (fs.existsSync(filePath)) {

@@ -1,158 +1,160 @@
+require('dotenv').config();
+const path = require('path');
 const express = require('express');
 const cors = require('cors');
+const helmet = require('helmet');
+const morgan = require('morgan');
+const rateLimit = require('express-rate-limit');
+
+const dbConnect = require('./config/db');
+const sanitizeInputs = require('./middleware/sanitize');
+
+const adminRoutes = require('./routes/admin');
+const categoryRoutes = require('./routes/categories');
+const galleryRoutes = require('./routes/galleries');
+const projectRoutes = require('./routes/projects');
+const contactRoutes = require('./routes/contact');
+const settingsRoutes = require('./routes/settings');
+const contentRoutes = require('./routes/content');
+const uploadRoutes = require('./routes/upload');
+const bootstrapRoutes = require('./routes/bootstrap');
+const serviceRoutes = require('./routes/services');
+const pageRoutes = require('./routes/pages');
+const postRoutes = require('./routes/posts');
+const testimonialRoutes = require('./routes/testimonials');
+const publicRoutes = require('./routes/public');
+const exportRoutes = require('./routes/export');
 
 const app = express();
+app.set('trust proxy', 1);
 
-app.use(cors({
-  origin: '*',
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization'],
+const corsOrigins = (process.env.CORS_ORIGINS || '')
+  .split(',')
+  .map((origin) => origin.trim())
+  .filter(Boolean);
+
+const corsConfig = {
+  origin: (origin, callback) => {
+    if (!origin || corsOrigins.length === 0 || corsOrigins.includes('*')) {
+      return callback(null, true);
+    }
+    if (corsOrigins.includes(origin)) {
+      return callback(null, true);
+    }
+    callback(new Error('CORS blocked'));
+  },
+  methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'x-revalidate-token']
+};
+
+const generalLimiter = rateLimit({
+  windowMs: Number(process.env.RATE_LIMIT_WINDOW_MS || 15 * 60 * 1000),
+  max: Number(process.env.RATE_LIMIT_MAX || 500),
+  standardHeaders: true,
+  legacyHeaders: false
+});
+
+const authLimiter = rateLimit({
+  windowMs: Number(process.env.AUTH_RATE_LIMIT_WINDOW_MS || 15 * 60 * 1000),
+  max: Number(process.env.AUTH_RATE_LIMIT_MAX || 20),
+  message: { error: 'Too many login attempts. Try again later.' },
+  standardHeaders: true,
+  legacyHeaders: false
+});
+
+const contactLimiter = rateLimit({
+  windowMs: Number(process.env.CONTACT_RATE_LIMIT_WINDOW_MS || 10 * 60 * 1000),
+  max: Number(process.env.CONTACT_RATE_LIMIT_MAX || 15),
+  message: { error: 'Too many contact form attempts. Try again later.' },
+  standardHeaders: true,
+  legacyHeaders: false
+});
+
+app.use(helmet({
+  crossOriginResourcePolicy: { policy: 'cross-origin' }
+}));
+app.use(cors(corsConfig));
+app.use(generalLimiter);
+app.use(express.json({ limit: '2mb' }));
+app.use(express.urlencoded({ extended: true, limit: '2mb' }));
+app.use(sanitizeInputs);
+app.use(morgan(process.env.NODE_ENV === 'production' ? 'combined' : 'dev'));
+
+app.use('/uploads', express.static(path.join(__dirname, 'uploads'), {
+  maxAge: '7d'
 }));
 
-app.use(express.json({ limit: '10mb' }));
-app.use(express.urlencoded({ extended: true, limit: '10mb' }));
+let dbReady = false;
+dbConnect()
+  .then((connected) => {
+    dbReady = connected;
+  })
+  .catch((error) => {
+    console.error('db.connect', error);
+    dbReady = false;
+  });
 
-const defaultContent = {
-  hero: { title: 'Capturamos instantes que no vuelven', subtitle: 'Fotografía artística para momentos únicos', cta: 'Contáctanos' },
-  services: { title: 'Qué hacemos', subtitle: 'Especialistas en capturar la esencia de cada momento', items: [
-    { id: 'bodas', title: 'Bodas', description: 'Documentamos el día más importante de vuestra vida con sensibilidad y arte.' },
-    { id: 'eventos', title: 'Eventos', description: 'Fiestas, celebraciones y encuentros que merecen ser recordados.' },
-    { id: 'personal', title: 'Personal', description: 'Retratos que revelan tu esencia y personalidad única.' },
-    { id: 'creativos', title: 'Proyectos Creativos', description: 'Colaboraciones artísticas y proyectos visuales especiales.' }
-  ]},
-  about: { title: 'Por qué Vorágine', subtitle: 'Más que fotografía, creamos experiencias visuales', items: [
-    { title: 'Mirada artística', description: 'Cada imagen es una composición cuidada con sentido estético.' },
-    { title: 'Edición cuidada', description: 'Posproducción profesional que realza sin alterar la esencia.' },
-    { title: 'Experiencia', description: 'Años de trabajo nos permiten anticipar y capturar cada momento.' },
-    { title: 'Entrega premium', description: 'Materiales de alta calidad y presentación impecable.' },
-    { title: 'Cercanía', description: 'Trato personalizado porque cada proyecto es único.' }
-  ]},
-  process: { title: 'Nuestro proceso', subtitle: 'Un viaje creativo juntos', steps: [
-    { number: '01', title: 'Nos cuentas tu historia', description: 'Escuchamos tus ideas, inquietudes y lo que quieres transmitir.' },
-    { number: '02', title: 'Diseñamos la sesión', description: 'Planificamos cada detalle para que todo fluya naturalmente.' },
-    { number: '03', title: 'Capturamos el momento', description: 'Trabajamos con sensibilidad, buscando la autenticidad.' },
-    { number: '04', title: 'Entregamos recuerdos', description: 'Cuidamos cada imagen y te entregamos obras de arte.' }
-  ]},
-  cta: { title: 'Cuéntanos qué quieres capturar', subtitle: 'Estamos aquí para escuchar tu historia', button: 'Escríbenos' }
-};
-
-const defaultCategories = [
-  { _id: '1', name: 'Bodas', slug: 'bodas', description: 'Fotografía de bodas' },
-  { _id: '2', name: 'Eventos', slug: 'eventos', description: 'Eventos y fiestas' },
-  { _id: '3', name: 'Personal', slug: 'personal', description: 'Retratos personales' },
-  { _id: '4', name: 'Proyectos Creativos', slug: 'proyectos-creativos', description: 'Proyectos artísticos' }
-];
-
-const defaultGalleries = [
-  { _id: '1', title: 'Boda Elena & Javier', slug: 'elena-javier', category: defaultCategories[0], images: [], featured: true },
-  { _id: '2', title: 'Sesión París', slug: 'session-paris', category: defaultCategories[2], images: [], featured: true }
-];
-
-let storedContent = { ...defaultContent };
-let storedSettings = {
-  siteName: 'Vorágine Estudio',
-  tagline: 'Capturamos instantes que no vuelven',
-  email: 'info@voragineestudio.com',
-  phone: '+34 600 000 000',
-  address: 'Madrid, España'
-};
-let messages = [];
-
-app.get('/api/health', (req, res) => {
-  res.json({ status: 'ok', timestamp: new Date().toISOString() });
-});
-
-app.get('/api/content/:section?', (req, res) => {
-  const { section } = req.params;
-  if (section) {
-    res.json({ section, data: storedContent[section] || {} });
-  } else {
-    res.json(storedContent);
+const requireDatabase = (req, res, next) => {
+  if (req.path === '/health') {
+    return next();
   }
-});
 
-app.put('/api/content/:section', (req, res) => {
-  const { section } = req.params;
-  const { data } = req.body;
-  storedContent[section] = data;
-  res.json({ section, data, message: 'Content updated successfully' });
-});
-
-app.get('/api/categories', (req, res) => {
-  res.json(defaultCategories);
-});
-
-app.get('/api/galleries', (req, res) => {
-  res.json(defaultGalleries);
-});
-
-app.get('/api/galleries/:slug', (req, res) => {
-  const gallery = defaultGalleries.find(g => g.slug === req.params.slug);
-  if (gallery) {
-    res.json(gallery);
-  } else {
-    res.status(404).json({ error: 'Gallery not found' });
-  }
-});
-
-app.post('/api/contact', (req, res) => {
-  const { name, email, phone, projectType, message } = req.body;
-  if (!name || !email || !projectType || !message) {
-    return res.status(400).json({ error: 'Missing required fields' });
-  }
-  const newMessage = {
-    _id: Date.now().toString(),
-    name,
-    email,
-    phone: phone || '',
-    projectType,
-    message,
-    read: false,
-    archived: false,
-    createdAt: new Date().toISOString()
-  };
-  messages.push(newMessage);
-  res.json({ message: 'Message received successfully', id: newMessage._id });
-});
-
-app.get('/api/contact', (req, res) => {
-  res.json(messages);
-});
-
-app.get('/api/settings', (req, res) => {
-  res.json(storedSettings);
-});
-
-app.put('/api/settings', (req, res) => {
-  storedSettings = { ...storedSettings, ...req.body };
-  res.json(storedSettings);
-});
-
-app.post('/api/admin/login', (req, res) => {
-  const { username, password } = req.body;
-  if (username === 'admin' && password === 'admin123') {
-    res.json({ 
-      token: 'demo-token-12345', 
-      admin: { id: '1', username: 'admin', email: 'admin@voragineestudio.com', name: 'Admin Vorágine' } 
+  if (!dbReady) {
+    return res.status(503).json({
+      error: 'Database unavailable. Configure MONGODB_URI to use the CMS.'
     });
-  } else {
-    res.status(401).json({ error: 'Invalid credentials' });
   }
+
+  return next();
+};
+
+app.get('/api/health', (_req, res) => {
+  res.json({
+    status: 'ok',
+    database: dbReady ? 'connected' : 'disconnected',
+    timestamp: new Date().toISOString()
+  });
 });
 
-app.get('/api/admin/me', (req, res) => {
-  const auth = req.header('Authorization');
-  if (auth && auth.includes('demo-token-12345')) {
-    res.json({ id: '1', username: 'admin', email: 'admin@voragineestudio.com', name: 'Admin Vorágine' });
-  } else {
-    res.status(401).json({ error: 'Not authenticated' });
-  }
+app.use('/api', requireDatabase);
+
+app.use('/api/public', publicRoutes);
+app.use('/api/admin', authLimiter, adminRoutes);
+app.use('/api/bootstrap-admin', bootstrapRoutes);
+app.use('/api/categories', categoryRoutes);
+app.use('/api/galleries', galleryRoutes);
+app.use('/api/projects', projectRoutes);
+app.use('/api/services', serviceRoutes);
+app.use('/api/pages', pageRoutes);
+app.use('/api/posts', postRoutes);
+app.use('/api/testimonials', testimonialRoutes);
+app.use('/api/contact', contactLimiter, contactRoutes);
+app.use('/api/settings', settingsRoutes);
+app.use('/api/content', contentRoutes);
+app.use('/api/upload', uploadRoutes);
+app.use('/api/export', exportRoutes);
+
+app.get('/', (_req, res) => {
+  res.json({
+    message: 'Voragine API is running',
+    version: '2.0.0'
+  });
 });
 
-app.get('/', (req, res) => {
-  res.json({ message: 'Voragine API is running', version: '1.0.0' });
+app.use((req, res) => {
+  res.status(404).json({ error: `Route not found: ${req.originalUrl}` });
 });
 
-app.options('*', cors());
+app.use((error, _req, res, _next) => {
+  console.error('server.error', error);
+  res.status(500).json({ error: 'Unexpected server error' });
+});
+
+if (require.main === module) {
+  const port = Number(process.env.PORT || 5000);
+  app.listen(port, () => {
+    console.log(`API listening on http://localhost:${port}`);
+  });
+}
 
 module.exports = app;

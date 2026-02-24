@@ -1,127 +1,191 @@
-// Prefer explicit env var; otherwise, adapt based on deployment context
-export const API_URL = process.env.NEXT_PUBLIC_API_URL || (
-  // SSR: point to backend in production; client: adapt to deployment host
-  typeof window !== 'undefined'
-    ? (window.location.hostname.endsWith('.vercel.app')
-        ? 'https://backend-vg.vercel.app/api'
-        : '/api')
-    : 'https://backend-vg.vercel.app/api'
-);
+const fallbackApiUrl = 'http://localhost:5000/api';
 
-export async function fetchAPI(endpoint: string, options: RequestInit = {}) {
-  const url = `${API_URL}${endpoint}`;
-  
-  const headers = {
-    'Content-Type': 'application/json',
-    ...options.headers,
-  };
-  
-  const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
-  if (token) {
-    (headers as Record<string, string>)['Authorization'] = `Bearer ${token}`;
+export const API_URL = process.env.NEXT_PUBLIC_API_URL || fallbackApiUrl;
+
+const getClientToken = () => {
+  if (typeof window === 'undefined') return null;
+  return localStorage.getItem('token');
+};
+
+async function parseError(response: Response) {
+  const data = await response.json().catch(() => null);
+  if (data?.error) return data.error;
+  if (Array.isArray(data?.details) && data.details.length) {
+    return data.details[0].message;
   }
-  
-  const response = await fetch(url, {
-    ...options,
-    headers,
-  });
-  
-  if (!response.ok) {
-    const error = await response.json().catch(() => ({ error: 'Request failed' }));
-    throw new Error(error.error || 'Request failed');
-  }
-  
-  return response.json();
+  return `Request failed (${response.status})`;
 }
 
+export async function fetchAPI<T = any>(endpoint: string, options: RequestInit = {}): Promise<T> {
+  const token = getClientToken();
+  const isFormData = options.body instanceof FormData;
+
+  const headers: Record<string, string> = {
+    ...(isFormData ? {} : { 'Content-Type': 'application/json' }),
+    ...((options.headers || {}) as Record<string, string>)
+  };
+
+  if (token) {
+    headers.Authorization = `Bearer ${token}`;
+  }
+
+  const response = await fetch(`${API_URL}${endpoint}`, {
+    ...options,
+    headers
+  });
+
+  if (!response.ok) {
+    throw new Error(await parseError(response));
+  }
+
+  if (response.status === 204) {
+    return undefined as T;
+  }
+
+  return response.json() as Promise<T>;
+}
+
+export const toProjectTypeOptions = () => ([
+  { value: 'bodas', label: 'Bodas' },
+  { value: 'eventos', label: 'Eventos' },
+  { value: 'personal', label: 'Retratos / personal' },
+  { value: 'proyectos-creativos', label: 'Proyectos creativos' },
+  { value: 'otro', label: 'Otro' }
+]);
+
 export const api = {
+  health: () => fetchAPI('/health'),
+  public: {
+    bootstrap: () => fetchAPI('/public/bootstrap')
+  },
   content: {
     get: (section?: string) => fetchAPI(`/content${section ? `/${section}` : ''}`),
-    update: (section: string, data: unknown) => 
-      fetchAPI(`/content/${section}`, { method: 'PUT', body: JSON.stringify({ data }) }),
+    update: (section: string, data: unknown) =>
+      fetchAPI(`/content/${section}`, { method: 'PUT', body: JSON.stringify({ data }) })
   },
-  
   categories: {
-    getAll: () => fetchAPI('/categories'),
+    getAll: (includeInactive = false) =>
+      fetchAPI(`/categories${includeInactive ? '?includeInactive=true' : ''}`),
     getBySlug: (slug: string) => fetchAPI(`/categories/${slug}`),
     create: (data: unknown) => fetchAPI('/categories', { method: 'POST', body: JSON.stringify(data) }),
-    update: (id: string, data: unknown) => 
+    update: (id: string, data: unknown) =>
       fetchAPI(`/categories/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
-    delete: (id: string) => fetchAPI(`/categories/${id}`, { method: 'DELETE' }),
+    delete: (id: string) => fetchAPI(`/categories/${id}`, { method: 'DELETE' })
   },
-  
   galleries: {
-    getAll: (params?: { category?: string; featured?: boolean; limit?: number }) => {
-      const query = new URLSearchParams(params as Record<string, string>).toString();
-      return fetchAPI(`/galleries${query ? `?${query}` : ''}`);
+    getAll: (params?: Record<string, string | number | boolean>) => {
+      const query = params ? `?${new URLSearchParams(
+        Object.entries(params).reduce<Record<string, string>>((acc, [key, value]) => {
+          acc[key] = String(value);
+          return acc;
+        }, {})
+      ).toString()}` : '';
+      return fetchAPI(`/galleries${query}`);
     },
     getBySlug: (slug: string) => fetchAPI(`/galleries/${slug}`),
     create: (data: unknown) => fetchAPI('/galleries', { method: 'POST', body: JSON.stringify(data) }),
-    update: (id: string, data: unknown) => 
+    update: (id: string, data: unknown) =>
       fetchAPI(`/galleries/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
     delete: (id: string) => fetchAPI(`/galleries/${id}`, { method: 'DELETE' }),
-    addImages: (id: string, images: unknown[]) => 
+    addImages: (id: string, images: unknown[]) =>
       fetchAPI(`/galleries/${id}/images`, { method: 'POST', body: JSON.stringify({ images }) }),
-    deleteImage: (id: string, imageId: string) => 
-      fetchAPI(`/galleries/${id}/images/${imageId}`, { method: 'DELETE' }),
+    deleteImage: (id: string, imageId: string) =>
+      fetchAPI(`/galleries/${id}/images/${imageId}`, { method: 'DELETE' })
   },
-  
+  projects: {
+    getAll: (params?: Record<string, string | number | boolean>) => {
+      const query = params ? `?${new URLSearchParams(
+        Object.entries(params).reduce<Record<string, string>>((acc, [key, value]) => {
+          acc[key] = String(value);
+          return acc;
+        }, {})
+      ).toString()}` : '';
+      return fetchAPI(`/projects${query}`);
+    },
+    getBySlug: (slug: string) => fetchAPI(`/projects/${slug}`),
+    create: (data: unknown) => fetchAPI('/projects', { method: 'POST', body: JSON.stringify(data) }),
+    update: (id: string, data: unknown) =>
+      fetchAPI(`/projects/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+    delete: (id: string) => fetchAPI(`/projects/${id}`, { method: 'DELETE' })
+  },
+  services: {
+    getAll: (includeInactive = false) =>
+      fetchAPI(`/services${includeInactive ? '?includeInactive=true' : ''}`),
+    getBySlug: (slug: string) => fetchAPI(`/services/${slug}`),
+    create: (data: unknown) => fetchAPI('/services', { method: 'POST', body: JSON.stringify(data) }),
+    update: (id: string, data: unknown) =>
+      fetchAPI(`/services/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+    delete: (id: string) => fetchAPI(`/services/${id}`, { method: 'DELETE' })
+  },
+  pages: {
+    getAll: (includeInactive = false) =>
+      fetchAPI(`/pages${includeInactive ? '?includeInactive=true' : ''}`),
+    getBySlug: (slug: string) => fetchAPI(`/pages/${slug}`),
+    create: (data: unknown) => fetchAPI('/pages', { method: 'POST', body: JSON.stringify(data) }),
+    update: (id: string, data: unknown) =>
+      fetchAPI(`/pages/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+    delete: (id: string) => fetchAPI(`/pages/${id}`, { method: 'DELETE' })
+  },
+  posts: {
+    getAll: (includeInactive = false, includeDrafts = false) =>
+      fetchAPI(`/posts?includeInactive=${includeInactive}&includeDrafts=${includeDrafts}`),
+    getBySlug: (slug: string) => fetchAPI(`/posts/${slug}?includeDraft=true`),
+    create: (data: unknown) => fetchAPI('/posts', { method: 'POST', body: JSON.stringify(data) }),
+    update: (id: string, data: unknown) =>
+      fetchAPI(`/posts/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+    delete: (id: string) => fetchAPI(`/posts/${id}`, { method: 'DELETE' })
+  },
+  testimonials: {
+    getAll: (includeInactive = false) =>
+      fetchAPI(`/testimonials${includeInactive ? '?includeInactive=true' : ''}`),
+    create: (data: unknown) => fetchAPI('/testimonials', { method: 'POST', body: JSON.stringify(data) }),
+    update: (id: string, data: unknown) =>
+      fetchAPI(`/testimonials/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+    delete: (id: string) => fetchAPI(`/testimonials/${id}`, { method: 'DELETE' })
+  },
   contact: {
     send: (data: unknown) => fetchAPI('/contact', { method: 'POST', body: JSON.stringify(data) }),
     getAll: (params?: { unread?: string; archived?: string }) => {
-      const query = params ? new URLSearchParams(params as Record<string, string>).toString() : '';
-      return fetchAPI(`/contact${query ? `?${query}` : ''}`);
+      const query = params ? `?${new URLSearchParams(params as Record<string, string>).toString()}` : '';
+      return fetchAPI(`/contact${query}`);
     },
     getById: (id: string) => fetchAPI(`/contact/${id}`),
     archive: (id: string) => fetchAPI(`/contact/${id}/archive`, { method: 'PUT' }),
-    delete: (id: string) => fetchAPI(`/contact/${id}`, { method: 'DELETE' }),
+    delete: (id: string) => fetchAPI(`/contact/${id}`, { method: 'DELETE' })
   },
-  
   settings: {
     get: () => fetchAPI('/settings'),
-    update: (data: unknown) => fetchAPI('/settings', { method: 'PUT', body: JSON.stringify(data) }),
+    update: (data: unknown) => fetchAPI('/settings', { method: 'PUT', body: JSON.stringify(data) })
   },
-  
   admin: {
-    login: (username: string, password: string) => 
-      fetchAPI('/admin/login', { method: 'POST', body: JSON.stringify({ username, password }) }),
+    login: (username: string, password: string) =>
+      fetchAPI<{ token: string }>('/admin/login', { method: 'POST', body: JSON.stringify({ username, password }) }),
     getMe: () => fetchAPI('/admin/me'),
-    changePassword: (currentPassword: string, newPassword: string) => 
-      fetchAPI('/admin/change-password', { 
-        method: 'POST', 
-        body: JSON.stringify({ currentPassword, newPassword }) 
+    changePassword: (currentPassword: string, newPassword: string) =>
+      fetchAPI('/admin/change-password', {
+        method: 'POST',
+        body: JSON.stringify({ currentPassword, newPassword })
       }),
+    getUsers: () => fetchAPI('/admin/users'),
+    createUser: (data: unknown) => fetchAPI('/admin/users', { method: 'POST', body: JSON.stringify(data) }),
+    updateUser: (id: string, data: unknown) =>
+      fetchAPI(`/admin/users/${id}`, { method: 'PUT', body: JSON.stringify(data) })
   },
-  
   upload: {
-    image: async (file: File, type: string = 'general') => {
+    image: async (file: File, type = 'general') => {
       const formData = new FormData();
       formData.append('image', file);
-      
-      const token = localStorage.getItem('token');
-      const response = await fetch(`${API_URL}/upload/${type}`, {
-        method: 'POST',
-        headers: token ? { Authorization: `Bearer ${token}` } : {},
-        body: formData,
-      });
-      
-      if (!response.ok) throw new Error('Upload failed');
-      return response.json();
+      return fetchAPI(`/upload/${type}`, { method: 'POST', body: formData });
     },
-    
-    multiple: async (files: File[], type: string = 'general') => {
+    multiple: async (files: File[], type = 'general') => {
       const formData = new FormData();
-      files.forEach(file => formData.append('images', file));
-      
-      const token = localStorage.getItem('token');
-      const response = await fetch(`${API_URL}/upload/multiple/${type}`, {
-        method: 'POST',
-        headers: token ? { Authorization: `Bearer ${token}` } : {},
-        body: formData,
-      });
-      
-      if (!response.ok) throw new Error('Upload failed');
-      return response.json();
+      files.forEach((file) => formData.append('images', file));
+      return fetchAPI(`/upload/multiple/${type}`, { method: 'POST', body: formData });
     },
+    remove: (type: string, filename: string) =>
+      fetchAPI(`/upload/${type}/${filename}`, { method: 'DELETE' })
   },
+  export: {
+    cms: () => fetchAPI('/export')
+  }
 };

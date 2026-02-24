@@ -26,6 +26,10 @@ const categorySchema = new mongoose.Schema({
   active: {
     type: Boolean,
     default: true
+  },
+  seo: {
+    title: { type: String, trim: true, default: '' },
+    description: { type: String, trim: true, default: '' }
   }
 }, {
   timestamps: true

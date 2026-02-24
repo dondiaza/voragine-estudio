@@ -2,6 +2,7 @@
 
 import { motion } from 'framer-motion';
 import Link from 'next/link';
+import Image from 'next/image';
 import { ArrowRight } from 'lucide-react';
 import { useInView } from '@/hooks/useHelpers';
 
@@ -90,10 +91,12 @@ export default function ServicesSection({
               <Link href={`#galerias?category=${service.id}`} className="block">
                 <div className="relative aspect-[4/5] overflow-hidden bg-gray-100 mb-6">
                   {service.image ? (
-                    <img
+                    <Image
                       src={service.image}
                       alt={service.title}
-                      className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
+                      fill
+                      sizes="(max-width: 768px) 100vw, 25vw"
+                      className="object-cover transition-transform duration-700 group-hover:scale-105"
                     />
                   ) : (
                     <div className="absolute inset-0 bg-gradient-to-br from-gray-200 to-gray-300 flex items-center justify-center">

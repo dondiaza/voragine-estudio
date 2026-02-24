@@ -1,5 +1,10 @@
 const express = require('express');
 const router = express.Router();
+const { body } = require('express-validator');
+const validate = require('../middleware/validate');
+const auth = require('../middleware/auth');
+const requireRole = require('../middleware/role');
+const { triggerRevalidation } = require('../utils/revalidate');
 
 const defaultContent = {
   hero: {
@@ -75,9 +80,10 @@ router.get('/:section?', async (req, res) => {
   }
 });
 
-const auth = require('../middleware/auth');
-
-router.put('/:section', auth, async (req, res) => {
+router.put('/:section', auth, requireRole(['admin', 'editor']), [
+  body('data').exists().withMessage('Data payload is required'),
+  validate
+], async (req, res) => {
   try {
     const Content = require('../models/Content');
     const { section } = req.params;
@@ -89,8 +95,10 @@ router.put('/:section', auth, async (req, res) => {
       { upsert: true, new: true }
     );
     
+    await triggerRevalidation({ reason: 'content.changed', paths: ['/', '/servicios', '/sobre-nosotros', '/contacto'] });
     res.json(content);
   } catch (error) {
+    console.error('content.update', error);
     res.status(500).json({ error: 'Server error: ' + error.message });
   }
 });

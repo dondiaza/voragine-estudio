@@ -1,98 +1,134 @@
-# 🖤 Vorágine Estudio
+# Vorágine Estudio (Front + Back + CMS)
 
-Estudio de fotografía especializado en bodas, eventos, fotografía personal y proyectos creativos.
+Repositorio full-stack para web corporativa de fotografía con contenido 100% configurable:
 
-## 🌐 URLs de Producción
+- `voragine/`: Frontend Next.js 14 (sitio público + panel CMS).
+- `backend-vg/`: API Express + MongoDB (colecciones CMS, auth, seguridad, email, revalidación).
 
-| Servicio | URL |
-|----------|-----|
-| **Frontend (Web)** | https://voragine.vercel.app |
-| **Panel Admin** | https://voragine.vercel.app/admin/login |
-| **Backend API** | https://backend-vg.vercel.app/api |
+## Arquitectura
 
-## 🔐 Credenciales de Administrador
+- Front público con rutas: `/`, `/servicios`, `/portfolio`, `/portfolio/[slug]`, `/sobre-nosotros`, `/contacto`, `/blog`, `/blog/[slug]`.
+- CMS en `/admin/*` con módulos para servicios, categorías, portfolio, páginas, blog, testimonios, mensajes, ajustes globales y usuarios.
+- Backend con modelos CMS:
+  - `Service`
+  - `Gallery` (portfolio/proyectos)
+  - `Category`
+  - `Page` (contenido modular)
+  - `Post` (blog)
+  - `Testimonial`
+  - `Settings` (global/contacto/SEO/CTAs/business)
+  - `Admin` (roles `admin` y `editor`)
+- Revalidación ISR vía webhook: backend -> `POST /api/revalidate` (Next).
+- Export de backup CMS: `GET /api/export` (solo admin).
 
-```
-Usuario: admin
-Contraseña: admin123
-```
+## Requisitos
 
-## 📋 Panel de Administración
+- Node.js 18+
+- MongoDB 6+
 
-El panel permite gestionar:
+## Setup Local
 
-- **Dashboard** - Vista general del sistema
-- **Galerías** - Crear, editar y eliminar galerías de fotos
-- **Mensajes** - Ver mensajes de contacto recibidos
-- **Configuración** - Editar información del sitio
-
-### Acceso al Panel
-
-1. Ve a: https://voragine.vercel.app/admin/login
-2. Ingresa las credenciales: `admin` / `admin123`
-3. Accede a las diferentes secciones del panel
-
-## 🛠️ Tecnologías
-
-**Frontend:**
-- Next.js 14 (App Router)
-- TypeScript
-- Tailwind CSS
-- Framer Motion
-
-**Backend:**
-- Node.js + Express
-- Funciones serverless en Vercel
-
-## 📁 Estructura del Proyecto
-
-```
-voragine/
-├── voragine/              # Frontend Next.js
-│   ├── app/               # Páginas y rutas
-│   │   ├── admin/         # Panel de administración
-│   │   └── page.tsx       # Landing page
-│   ├── components/        # Componentes React
-│   └── lib/               # Utilidades y API
-│
-└── backend-vg/            # Backend Express
-    ├── server.js          # Servidor principal
-    └── vercel.json        # Configuración Vercel
-```
-
-## 🚀 Desarrollo Local
+1. Backend:
 
 ```bash
-# Backend
 cd backend-vg
 npm install
-npm start
+cp .env.example .env
+```
 
-# Frontend (en otra terminal)
+2. Frontend:
+
+```bash
 cd voragine
 npm install
+cp .env.example .env
+```
+
+3. Configura variables importantes:
+
+- Backend `.env`:
+  - `MONGODB_URI`
+  - `JWT_SECRET`
+  - `CORS_ORIGINS`
+  - SMTP (`SMTP_HOST`, `SMTP_USER`, `SMTP_PASS`) si quieres email real
+  - `REVALIDATE_WEBHOOK_URL=http://localhost:3000/api/revalidate`
+  - `REVALIDATE_WEBHOOK_TOKEN=<mismo token del front>`
+- Frontend `.env`:
+  - `NEXT_PUBLIC_API_URL=http://localhost:5000/api`
+  - `CMS_API_URL=http://localhost:5000/api`
+  - `REVALIDATE_TOKEN=<mismo token del back>`
+  - `NEXT_PUBLIC_SITE_URL=http://localhost:3000`
+
+4. Seed inicial:
+
+```bash
+cd backend-vg
+npm run seed
+```
+
+Credenciales seed:
+
+- `admin / admin12345`
+- `editor / editor12345`
+
+5. Ejecutar:
+
+```bash
+# terminal 1
+cd backend-vg
+npm run dev
+
+# terminal 2
+cd voragine
 npm run dev
 ```
 
-## 📝 API Endpoints
+## URLs Locales
 
-| Método | Endpoint | Descripción |
-|--------|----------|-------------|
-| GET | /api/health | Estado del servidor |
-| GET | /api/content | Contenido de todas las secciones |
-| PUT | /api/content/:section | Actualizar sección |
-| GET | /api/categories | Listar categorías |
-| GET | /api/galleries | Listar galerías |
-| POST | /api/contact | Enviar mensaje de contacto |
-| GET | /api/settings | Configuración del sitio |
-| PUT | /api/settings | Actualizar configuración |
-| POST | /api/admin/login | Login de administrador |
-| GET | /api/admin/me | Perfil del administrador |
+- Sitio: `http://localhost:3000`
+- CMS: `http://localhost:3000/admin/login`
+- API: `http://localhost:5000/api`
 
-## 📦 Repositorio
+## Flujo CMS
 
-https://github.com/dondiaza/voragine-estudio
+1. Crear/ordenar `Categorías`.
+2. Crear `Servicios`.
+3. Cargar `Portfolio` (proyectos + imágenes + tags + categoría).
+4. Editar `Páginas` y SEO por página.
+5. Publicar artículos en `Blog`.
+6. Gestionar `Testimonios`.
+7. Ajustar `Configuración global` (contacto, CTAs, SEO, schema business).
 
-## 📄 Licencia
+## Seguridad y Operación
 
-Proyecto privado para Vorágine Estudio.
+- Auth JWT para panel.
+- Roles/permisos: `admin`, `editor`.
+- Rate limit global, login y contacto.
+- Sanitización de input.
+- CORS configurable.
+- Honeypot anti-spam en formulario.
+- Export de backup desde CMS (`Configuración -> Exportar backup`).
+
+## Despliegue recomendado
+
+- Frontend: Vercel (Next.js).
+- Backend: Vercel/Render/Fly con Mongo Atlas.
+- Dominios:
+  - Front: `www.tudominio.com`
+  - API: `api.tudominio.com`
+- SSL gestionado por el proveedor.
+- Configurar webhook de revalidación (`REVALIDATE_WEBHOOK_URL`) apuntando al dominio del front.
+
+## CI/CD
+
+- Pipeline base incluido: `.github/workflows/ci.yml`.
+- Ejecuta en push/PR:
+  - install backend + sanity check
+  - install frontend + `next build`
+
+## Verificación rápida
+
+- `GET /api/health` responde `database: connected`.
+- Cambiar un servicio/proyecto en CMS actualiza front (tras webhook revalidate).
+- Formulario contacto crea mensaje y envía mail si SMTP está configurado.
+- `sitemap.xml` y `robots.txt` disponibles en el front.

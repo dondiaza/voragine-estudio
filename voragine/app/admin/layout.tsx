@@ -6,9 +6,15 @@ import Link from 'next/link';
 import { motion } from 'framer-motion';
 import { 
   LayoutDashboard, 
-  Image, 
+  Briefcase,
+  FolderTree,
+  Image,
+  FileText,
+  Newspaper,
+  Quote,
   MessageSquare, 
   Settings, 
+  Users,
   LogOut,
   Menu,
   X
@@ -17,9 +23,15 @@ import { api } from '@/lib/api';
 
 const navItems = [
   { href: '/admin/dashboard', label: 'Dashboard', icon: LayoutDashboard },
-  { href: '/admin/galleries', label: 'Galerías', icon: Image },
+  { href: '/admin/services', label: 'Servicios', icon: Briefcase },
+  { href: '/admin/categories', label: 'Categorías', icon: FolderTree },
+  { href: '/admin/projects', label: 'Portfolio', icon: Image },
+  { href: '/admin/pages', label: 'Páginas', icon: FileText },
+  { href: '/admin/blog', label: 'Blog', icon: Newspaper },
+  { href: '/admin/testimonials', label: 'Testimonios', icon: Quote },
   { href: '/admin/messages', label: 'Mensajes', icon: MessageSquare },
   { href: '/admin/settings', label: 'Configuración', icon: Settings },
+  { href: '/admin/users', label: 'Usuarios', icon: Users },
 ];
 
 export default function AdminLayout({

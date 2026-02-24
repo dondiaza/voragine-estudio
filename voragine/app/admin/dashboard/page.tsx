@@ -3,11 +3,14 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { motion } from 'framer-motion';
-import { Image, MessageSquare, FolderOpen, TrendingUp } from 'lucide-react';
+import { Image, MessageSquare, FolderOpen, TrendingUp, Briefcase, FileText, Newspaper } from 'lucide-react';
 import { api } from '@/lib/api';
 
 interface Stats {
-  galleries: number;
+  projects: number;
+  services: number;
+  pages: number;
+  posts: number;
   messages: number;
   unreadMessages: number;
   categories: number;
@@ -15,7 +18,10 @@ interface Stats {
 
 export default function DashboardPage() {
   const [stats, setStats] = useState<Stats>({
-    galleries: 0,
+    projects: 0,
+    services: 0,
+    pages: 0,
+    posts: 0,
     messages: 0,
     unreadMessages: 0,
     categories: 0,
@@ -25,17 +31,24 @@ export default function DashboardPage() {
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const [galleries, categories, messages] = await Promise.all([
-          api.galleries.getAll(),
+        const [projects, services, pages, posts, categories, unreadMessages, allMessages] = await Promise.all([
+          api.projects.getAll(),
+          api.services.getAll(true),
+          api.pages.getAll(true),
+          api.posts.getAll(true, true),
           api.categories.getAll(),
           api.contact.getAll({ unread: 'true' }),
-        ]);
+          api.contact.getAll({ archived: 'true' }),
+        ]) as [unknown[], unknown[], unknown[], unknown[], unknown[], unknown[], unknown[]];
         
         setStats({
-          galleries: galleries.length,
+          projects: projects.length,
+          services: services.length,
+          pages: pages.length,
+          posts: posts.length,
           categories: categories.length,
-          messages: 0,
-          unreadMessages: messages.length,
+          messages: allMessages.length,
+          unreadMessages: unreadMessages.length,
         });
       } catch (error) {
         console.error('Error fetching stats:', error);
@@ -48,8 +61,11 @@ export default function DashboardPage() {
   }, []);
   
   const statCards = [
-    { label: 'Galerías', value: stats.galleries, icon: Image, href: '/admin/galleries', color: 'bg-voragine-accent' },
-    { label: 'Categorías', value: stats.categories, icon: FolderOpen, href: '/admin/galleries', color: 'bg-voragine-black' },
+    { label: 'Proyectos', value: stats.projects, icon: Image, href: '/admin/projects', color: 'bg-voragine-accent' },
+    { label: 'Servicios', value: stats.services, icon: Briefcase, href: '/admin/services', color: 'bg-voragine-black' },
+    { label: 'Páginas', value: stats.pages, icon: FileText, href: '/admin/pages', color: 'bg-slate-700' },
+    { label: 'Blog', value: stats.posts, icon: Newspaper, href: '/admin/blog', color: 'bg-indigo-600' },
+    { label: 'Categorías', value: stats.categories, icon: FolderOpen, href: '/admin/categories', color: 'bg-zinc-700' },
     { label: 'Mensajes nuevos', value: stats.unreadMessages, icon: MessageSquare, href: '/admin/messages', color: 'bg-green-500' },
   ];
   
@@ -72,7 +88,7 @@ export default function DashboardPage() {
         </p>
       </div>
       
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6 mb-8">
         {statCards.map((stat, index) => {
           const Icon = stat.icon;
           
@@ -111,10 +127,17 @@ export default function DashboardPage() {
           </h2>
           <div className="space-y-3">
             <Link
-              href="/admin/galleries"
+              href="/admin/projects"
               className="flex items-center justify-between p-4 bg-voragine-bg hover:bg-gray-100 transition-colors"
             >
-              <span className="text-voragine-black">Crear nueva galería</span>
+              <span className="text-voragine-black">Crear nuevo proyecto</span>
+              <TrendingUp className="w-5 h-5 text-voragine-gray" />
+            </Link>
+            <Link
+              href="/admin/services"
+              className="flex items-center justify-between p-4 bg-voragine-bg hover:bg-gray-100 transition-colors"
+            >
+              <span className="text-voragine-black">Editar servicios</span>
               <TrendingUp className="w-5 h-5 text-voragine-gray" />
             </Link>
             <Link
@@ -151,6 +174,10 @@ export default function DashboardPage() {
             <div className="flex items-center justify-between py-3 border-b border-gray-100">
               <span className="text-voragine-gray">Base de datos</span>
               <span className="text-green-500 text-sm font-medium">● Conectada</span>
+            </div>
+            <div className="flex items-center justify-between py-3 border-b border-gray-100">
+              <span className="text-voragine-gray">Mensajes totales</span>
+              <span className="text-voragine-black text-sm">{stats.messages}</span>
             </div>
             <div className="flex items-center justify-between py-3">
               <span className="text-voragine-gray">Última actualización</span>

@@ -1,171 +1,65 @@
-# Vorágine Estudio - Backend API
+# Vorágine Backend API (Express + MongoDB)
 
-Backend REST API para el estudio de fotografía Vorágine.
+API CMS para el sitio de fotografía.
 
-## Tecnologías
+## Colecciones
 
-- **Node.js** - Runtime JavaScript
-- **Express** - Framework web
-- **MongoDB** - Base de datos NoSQL
-- **Mongoose** - ODM para MongoDB
-- **JWT** - Autenticación
-- **Multer** - Subida de archivos
-
-## Requisitos
-
-- Node.js 18+
-- MongoDB 6+
-- npm o yarn
-
-## Instalación
-
-```bash
-# Instalar dependencias
-npm install
-
-# Copiar variables de entorno
-cp .env.example .env
-
-# Iniciar MongoDB (si no está corriendo)
-mongod --dbpath /path/to/data
-
-# Poblar base de datos con datos de prueba
-npm run seed
-
-# Desarrollo
-npm run dev
-
-# Producción
-npm start
-```
+- `Admin` (roles `admin` / `editor`)
+- `Service`
+- `Category`
+- `Gallery` (proyectos/portfolio)
+- `Page` (modular)
+- `Post`
+- `Testimonial`
+- `Settings`
+- `Message`
 
 ## Variables de entorno
 
-```
-PORT=5000
-MONGODB_URI=mongodb://localhost:27017/voragine
-JWT_SECRET=your-super-secret-jwt-key-change-in-production
-JWT_EXPIRE=7d
-NODE_ENV=development
-```
+Revisa `.env.example`. Claves críticas:
 
-## Estructura
+- `MONGODB_URI`
+- `JWT_SECRET`
+- `CORS_ORIGINS`
+- `REVALIDATE_WEBHOOK_URL`
+- `REVALIDATE_WEBHOOK_TOKEN`
+- SMTP (`SMTP_HOST`, `SMTP_USER`, `SMTP_PASS`, `SMTP_FROM`)
 
-```
-backend-vg/
-├── config/         # Configuración (DB, JWT)
-├── middleware/     # Middleware (auth, upload)
-├── models/         # Modelos Mongoose
-├── routes/         # Rutas API
-├── uploads/        # Archivos subidos
-├── seed.js         # Datos de prueba
-└── server.js       # Punto de entrada
+## Comandos
+
+```bash
+npm install
+npm run seed
+npm run dev
+npm start
 ```
 
-## API Endpoints
+## Endpoints principales
 
-### Autenticación
-- `POST /api/admin/login` - Login administrador
-- `GET /api/admin/me` - Perfil actual
-- `POST /api/admin/change-password` - Cambiar contraseña
+- `GET /api/health`
+- `POST /api/admin/login`
+- `GET /api/admin/me`
+- `GET/POST/PUT/DELETE /api/services`
+- `GET/POST/PUT/DELETE /api/categories`
+- `GET/POST/PUT/DELETE /api/projects` (alias de galerías)
+- `GET/POST/PUT/DELETE /api/pages`
+- `GET/POST/PUT/DELETE /api/posts`
+- `GET/POST/PUT/DELETE /api/testimonials`
+- `GET/PUT /api/settings`
+- `POST /api/contact` (honeypot + email)
+- `GET /api/export` (admin backup)
 
-### Contenido
-- `GET /api/content` - Todo el contenido
-- `GET /api/content/:section` - Sección específica
-- `PUT /api/content/:section` - Actualizar sección
+## Seguridad
 
-### Categorías
-- `GET /api/categories` - Listar categorías
-- `GET /api/categories/:slug` - Obtener categoría
-- `POST /api/categories` - Crear categoría
-- `PUT /api/categories/:id` - Actualizar categoría
-- `DELETE /api/categories/:id` - Eliminar categoría
+- Helmet
+- Rate limiting (global/login/contacto)
+- Sanitización de inputs
+- Auth JWT
+- Roles/permisos por endpoint
 
-### Galerías
-- `GET /api/galleries` - Listar galerías
-- `GET /api/galleries/:slug` - Obtener galería
-- `POST /api/galleries` - Crear galería
-- `PUT /api/galleries/:id` - Actualizar galería
-- `DELETE /api/galleries/:id` - Eliminar galería
-- `POST /api/galleries/:id/images` - Añadir imágenes
-- `DELETE /api/galleries/:id/images/:imageId` - Eliminar imagen
+## Revalidación front
 
-### Contacto
-- `POST /api/contact` - Enviar mensaje
-- `GET /api/contact` - Listar mensajes (admin)
-- `GET /api/contact/:id` - Ver mensaje
-- `PUT /api/contact/:id/archive` - Archivar mensaje
-- `DELETE /api/contact/:id` - Eliminar mensaje
+Después de mutaciones CMS, el backend dispara webhook a Next:
 
-### Configuración
-- `GET /api/settings` - Obtener configuración
-- `PUT /api/settings` - Actualizar configuración
-
-### Upload
-- `POST /api/upload/:type` - Subir imagen
-- `POST /api/upload/multiple/:type` - Subir múltiples imágenes
-- `DELETE /api/upload/:type/:filename` - Eliminar archivo
-
-## Modelos
-
-### Admin
-- username (único)
-- password (hasheado)
-- email
-- name
-
-### Category
-- name
-- slug (único)
-- description
-- image
-- order
-- active
-
-### Gallery
-- title
-- slug (único)
-- description
-- category (ref)
-- images[]
-- coverImage
-- featured
-- active
-
-### Message
-- name
-- email
-- phone
-- projectType
-- message
-- read
-- archived
-
-### Content
-- section (único)
-- data (Mixed)
-
-### Settings
-- siteName
-- tagline
-- email
-- phone
-- address
-- social{}
-
-## Autenticación
-
-El panel de administración usa JWT para autenticación. Incluye el token en el header:
-
-```
-Authorization: Bearer <token>
-```
-
-## Datos de prueba
-
-Después de ejecutar `npm run seed`:
-
-- Usuario admin: `admin` / `admin123`
-- 4 categorías creadas
-- Galerías de ejemplo
-- Contenido precargado
+- `REVALIDATE_WEBHOOK_URL=http://localhost:3000/api/revalidate`
+- Header `x-revalidate-token` con `REVALIDATE_WEBHOOK_TOKEN`

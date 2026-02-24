@@ -23,6 +23,15 @@ const adminSchema = new mongoose.Schema({
   name: {
     type: String,
     trim: true
+  },
+  role: {
+    type: String,
+    enum: ['admin', 'editor'],
+    default: 'admin'
+  },
+  active: {
+    type: Boolean,
+    default: true
   }
 }, {
   timestamps: true

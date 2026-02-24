@@ -1,93 +1,73 @@
-import Header from '@/components/Header';
-import Footer from '@/components/Footer';
-import HeroSection from '@/components/sections/HeroSection';
-import ServicesSection from '@/components/sections/ServicesSection';
-import GallerySection from '@/components/sections/GallerySection';
-import AboutSection from '@/components/sections/AboutSection';
-import ProcessSection from '@/components/sections/ProcessSection';
-import CTASection from '@/components/sections/CTASection';
-import ContactSection from '@/components/sections/ContactSection';
+import type { Metadata } from 'next';
+import Link from 'next/link';
+import SiteFrame from '@/components/site/SiteFrame';
+import PageHero from '@/components/site/PageHero';
+import ServicesGrid from '@/components/site/ServicesGrid';
+import PortfolioGallery from '@/components/site/PortfolioGallery';
+import Testimonials from '@/components/site/Testimonials';
+import BlogList from '@/components/site/BlogList';
+import PageModules from '@/components/site/PageModules';
+import {
+  getCategories,
+  getPage,
+  getPosts,
+  getProjects,
+  getServices,
+  getSettings,
+  getTestimonials
+} from '@/lib/cms';
+import { buildPageMetadata } from '@/lib/seo';
 
-const getApiUrl = () => {
-  if (process.env.NEXT_PUBLIC_API_URL) return process.env.NEXT_PUBLIC_API_URL;
-  if (process.env.VERCEL) return 'https://backend-vg.vercel.app/api';
-  return 'http://localhost:5000/api';
-};
-
-async function getData() {
-  const apiUrl = getApiUrl();
-  try {
-    const [contentRes, galleriesRes, categoriesRes] = await Promise.all([
-      fetch(`${apiUrl}/content`, {
-        cache: 'no-store',
-      }),
-      fetch(`${apiUrl}/galleries`, {
-        cache: 'no-store',
-      }),
-      fetch(`${apiUrl}/categories`, {
-        cache: 'no-store',
-      }),
-    ]);
-    
-    const content = contentRes.ok ? await contentRes.json() : {};
-    const galleries = galleriesRes.ok ? await galleriesRes.json() : [];
-    const categories = categoriesRes.ok ? await categoriesRes.json() : [];
-    
-    return { content, galleries, categories };
-  } catch (error) {
-    console.error('Error fetching data:', error);
-    return { content: {}, galleries: [], categories: [] };
-  }
+export async function generateMetadata(): Promise<Metadata> {
+  const [settings, page] = await Promise.all([getSettings(), getPage('home')]);
+  return buildPageMetadata({
+    pagePath: '/',
+    page,
+    settings,
+    fallbackTitle: 'Inicio',
+    fallbackDescription: settings.seo?.defaultDescription || 'Estudio de fotografía profesional.'
+  });
 }
 
 export default async function HomePage() {
-  const { content, galleries, categories } = await getData();
-  
+  const [settings, page, services, categories, projects, testimonials, posts] = await Promise.all([
+    getSettings(),
+    getPage('home'),
+    getServices(),
+    getCategories(),
+    getProjects({ featured: true }),
+    getTestimonials(),
+    getPosts(3)
+  ]);
+
   return (
-    <>
-      <Header />
-      
-      <main>
-        <HeroSection
-          title={content.hero?.title}
-          subtitle={content.hero?.subtitle}
-          cta={content.hero?.cta}
-          heroImage={content.hero?.heroImage}
-        />
-        
-        <ServicesSection
-          title={content.services?.title}
-          subtitle={content.services?.subtitle}
-          services={content.services?.items}
-        />
-        
-        <GallerySection
-          galleries={galleries}
-          categories={categories}
-        />
-        
-        <AboutSection
-          title={content.about?.title}
-          subtitle={content.about?.subtitle}
-          advantages={content.about?.items}
-        />
-        
-        <ProcessSection
-          title={content.process?.title}
-          subtitle={content.process?.subtitle}
-          steps={content.process?.steps}
-        />
-        
-        <CTASection
-          title={content.cta?.title}
-          subtitle={content.cta?.subtitle}
-          buttonText={content.cta?.button}
-        />
-        
-        <ContactSection />
-      </main>
-      
-      <Footer />
-    </>
+    <SiteFrame settings={settings}>
+      <PageHero
+        eyebrow={page?.hero?.eyebrow || settings.siteName}
+        title={page?.hero?.title || settings.tagline || 'Fotografía profesional'}
+        subtitle={page?.hero?.subtitle || settings.seo?.defaultDescription}
+        image={page?.hero?.image}
+        ctaLabel={page?.hero?.ctaLabel || settings.ctas?.primaryLabel}
+        ctaUrl={page?.hero?.ctaUrl || settings.ctas?.primaryUrl || '/contacto'}
+      />
+
+      <ServicesGrid services={services.slice(0, 4)} />
+
+      <PortfolioGallery projects={projects} categories={categories} />
+
+      <Testimonials testimonials={testimonials.filter((item) => item.featured).slice(0, 4)} />
+
+      <PageModules modules={page?.modules} />
+
+      <section className="section-padding bg-white">
+        <div className="container-fluid flex flex-wrap items-center justify-between gap-4">
+          <h2 className="heading-md text-voragine-black">Últimos artículos</h2>
+          <Link href="/blog" className="btn-secondary">
+            Ver blog
+          </Link>
+        </div>
+        <BlogList posts={posts} />
+      </section>
+    </SiteFrame>
   );
 }

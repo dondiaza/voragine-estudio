@@ -1,86 +1,221 @@
 require('dotenv').config();
 const mongoose = require('mongoose');
+
 const Admin = require('./models/Admin');
 const Category = require('./models/Category');
 const Gallery = require('./models/Gallery');
-const Content = require('./models/Content');
+const Service = require('./models/Service');
+const Page = require('./models/Page');
+const Post = require('./models/Post');
+const Testimonial = require('./models/Testimonial');
 const Settings = require('./models/Settings');
+const Content = require('./models/Content');
+const Message = require('./models/Message');
 
 const categories = [
   { name: 'Bodas', slug: 'bodas', description: 'Fotografía de bodas artística y emotiva', order: 1 },
-  { name: 'Eventos', slug: 'eventos', description: 'Celebraciones y eventos especiales', order: 2 },
-  { name: 'Personal', slug: 'personal', description: 'Retratos y sesiones personales', order: 3 },
-  { name: 'Proyectos Creativos', slug: 'proyectos-creativos', description: 'Proyectos artísticos y colaboraciones', order: 4 }
+  { name: 'Eventos', slug: 'eventos', description: 'Cobertura fotográfica para eventos corporativos y sociales', order: 2 },
+  { name: 'Retratos', slug: 'retratos', description: 'Sesiones personales, pareja y familiar', order: 3 },
+  { name: 'Comercial', slug: 'comercial', description: 'Fotografía para marcas, productos y campañas', order: 4 }
 ];
 
-const sampleGalleries = [
+const services = [
   {
-    title: 'Elena & Javier',
-    slug: 'elena-javier',
-    description: 'Una boda íntima en un castillo medieval',
-    category: 'bodas',
+    title: 'Fotografía de bodas',
+    slug: 'fotografia-bodas',
+    excerpt: 'Cobertura documental y editorial para bodas íntimas y celebraciones grandes.',
+    description: 'Acompañamos todo el día con enfoque documental y dirección editorial cuando hace falta.',
+    coverImage: '/images/services/bodas.jpg',
+    tags: ['bodas', 'editorial'],
     featured: true,
-    images: [
-      { url: '/images/gallery/wedding-1.jpg', alt: 'Novia caminando', order: 1 },
-      { url: '/images/gallery/wedding-2.jpg', alt: 'Ceremonia', order: 2 },
-      { url: '/images/gallery/wedding-3.jpg', alt: 'Anillos', order: 3 }
-    ]
+    order: 1
   },
   {
-    title: 'Sesión en París',
-    slug: 'session-paris',
-    description: 'Retratos urbanos en la ciudad luz',
-    category: 'personal',
+    title: 'Eventos y corporativo',
+    slug: 'eventos-corporativo',
+    excerpt: 'Eventos sociales, lanzamientos, congresos y comunicación corporativa.',
+    description: 'Entregas rápidas, material optimizado para prensa y redes, y cobertura en múltiples formatos.',
+    coverImage: '/images/services/eventos.jpg',
+    tags: ['eventos', 'corporativo'],
     featured: true,
-    images: [
-      { url: '/images/gallery/portrait-1.jpg', alt: 'Retrato París', order: 1 }
-    ]
+    order: 2
+  },
+  {
+    title: 'Retrato personal',
+    slug: 'retrato-personal',
+    excerpt: 'Retratos de autor para profesionales, artistas y familias.',
+    description: 'Diseño de sesión y dirección de pose con enfoque natural y estético.',
+    coverImage: '/images/services/retratos.jpg',
+    tags: ['retratos'],
+    order: 3
+  },
+  {
+    title: 'Producción comercial',
+    slug: 'produccion-comercial',
+    excerpt: 'Fotografía de producto y campañas para marcas.',
+    description: 'Producción en estudio o locación con dirección de arte y entrega multiplataforma.',
+    coverImage: '/images/services/comercial.jpg',
+    tags: ['comercial', 'producto'],
+    order: 4
   }
 ];
 
-const content = {
-  hero: {
-    title: 'Capturamos instantes que no vuelven',
-    subtitle: 'Fotografía artística para momentos únicos',
-    cta: 'Contáctanos'
+const testimonials = [
+  {
+    name: 'Marta y Diego',
+    role: 'Pareja',
+    quote: 'Nos sentimos acompañados todo el tiempo y las fotos quedaron increíbles.',
+    rating: 5,
+    featured: true,
+    order: 1
   },
-  services: {
-    title: 'Qué hacemos',
-    subtitle: 'Especialistas en capturar la esencia de cada momento',
-    items: [
-      { id: 'bodas', title: 'Bodas', description: 'Documentamos el día más importante de vuestra vida con sensibilidad y arte.' },
-      { id: 'eventos', title: 'Eventos', description: 'Fiestas, celebraciones y encuentros que merecen ser recordados.' },
-      { id: 'personal', title: 'Personal', description: 'Retratos que revelan tu esencia y personalidad única.' },
-      { id: 'creativos', title: 'Proyectos Creativos', description: 'Colaboraciones artísticas y proyectos visuales especiales.' }
-    ]
-  },
-  about: {
-    title: 'Por qué Vorágine',
-    subtitle: 'Más que fotografía, creamos experiencias visuales',
-    items: [
-      { title: 'Mirada artística', description: 'Cada imagen es una composición cuidada con sentido estético.' },
-      { title: 'Edición cuidada', description: 'Posproducción profesional que realza sin alterar la esencia.' },
-      { title: 'Experiencia', description: 'Años de trabajo nos permiten anticipar y capturar cada momento.' },
-      { title: 'Entrega premium', description: 'Materiales de alta calidad y presentación impecable.' },
-      { title: 'Cercanía', description: 'Trato personalizado porque cada proyecto es único.' }
-    ]
-  },
-  process: {
-    title: 'Nuestro proceso',
-    subtitle: 'Un viaje creativo juntos',
-    steps: [
-      { number: '01', title: 'Nos cuentas tu historia', description: 'Escuchamos tus ideas, inquietudes y lo que quieres transmitir.' },
-      { number: '02', title: 'Diseñamos la sesión', description: 'Planificamos cada detalle para que todo fluya naturalmente.' },
-      { number: '03', title: 'Capturamos el momento', description: 'Trabajamos con sensibilidad, buscando la autenticidad.' },
-      { number: '04', title: 'Entregamos recuerdos', description: 'Cuidamos cada imagen y te entregamos obras de arte.' }
-    ]
-  },
-  cta: {
-    title: 'Cuéntanos qué quieres capturar',
-    subtitle: 'Estamos aquí para escuchar tu historia',
-    button: 'Escríbenos'
+  {
+    name: 'Ana Torres',
+    role: 'Marketing Manager',
+    company: 'Lumen Studio',
+    quote: 'Respuesta rápida, ejecución impecable y entregables listos para campaña.',
+    rating: 5,
+    featured: true,
+    order: 2
   }
-};
+];
+
+const posts = [
+  {
+    title: 'Cómo planificar una sesión de boda sin estrés',
+    slug: 'planificar-sesion-boda-sin-estres',
+    excerpt: 'Una guía práctica para coordinar fotografía, tiempos y expectativas.',
+    content: 'Planificar una boda implica muchas decisiones. En este artículo compartimos el flujo recomendado para que la fotografía sea natural y sin prisas.',
+    category: 'guias',
+    tags: ['bodas', 'guia'],
+    publishedAt: new Date('2026-01-15')
+  },
+  {
+    title: 'Checklist de fotografía para eventos corporativos',
+    slug: 'checklist-fotografia-eventos-corporativos',
+    excerpt: 'Qué preparar antes de cubrir un evento de marca.',
+    content: 'Antes de cualquier evento corporativo revisamos objetivos, momentos clave, voceros y formatos de entrega.',
+    category: 'corporativo',
+    tags: ['eventos', 'corporativo'],
+    publishedAt: new Date('2026-01-22')
+  }
+];
+
+const pages = [
+  {
+    name: 'Home',
+    slug: 'home',
+    hero: {
+      eyebrow: 'Vorágine Estudio',
+      title: 'Capturamos instantes que no vuelven',
+      subtitle: 'Fotografía artística para bodas, eventos, retratos y proyectos comerciales.',
+      ctaLabel: 'Agenda una reunión',
+      ctaUrl: '/contacto'
+    },
+    modules: [
+      {
+        type: 'intro',
+        heading: 'Fotografía corporativa y emocional',
+        body: 'Combinamos narrativa documental y dirección editorial para crear imágenes con valor real de marca.',
+        order: 1
+      }
+    ],
+    seo: {
+      title: 'Fotografía profesional en Madrid',
+      description: 'Estudio de fotografía para bodas, eventos, retratos y marcas. Equipo creativo en Madrid.',
+      canonical: '/'
+    }
+  },
+  {
+    name: 'Servicios',
+    slug: 'servicios',
+    hero: {
+      eyebrow: 'Servicios',
+      title: 'Soluciones fotográficas para cada necesidad',
+      subtitle: 'Diseñamos cada sesión para objetivos concretos y resultados medibles.',
+      ctaLabel: 'Solicitar propuesta',
+      ctaUrl: '/contacto'
+    },
+    modules: [],
+    seo: {
+      title: 'Servicios de fotografía',
+      description: 'Conoce servicios de fotografía para bodas, eventos, retratos y campañas.',
+      canonical: '/servicios'
+    }
+  },
+  {
+    name: 'Portfolio',
+    slug: 'portfolio',
+    hero: {
+      eyebrow: 'Portfolio',
+      title: 'Casos y proyectos destacados',
+      subtitle: 'Una selección de trabajos reales con enfoque artístico y comercial.',
+      ctaLabel: 'Ver casos',
+      ctaUrl: '#proyectos'
+    },
+    seo: {
+      title: 'Portfolio de fotografía',
+      description: 'Galerías y casos reales de fotografía profesional.',
+      canonical: '/portfolio'
+    }
+  },
+  {
+    name: 'Sobre nosotros',
+    slug: 'sobre-nosotros',
+    hero: {
+      eyebrow: 'Equipo',
+      title: 'Somos un estudio creativo orientado a resultados',
+      subtitle: 'Años de experiencia entre editorial, documental y comercial.',
+      ctaLabel: 'Conversemos',
+      ctaUrl: '/contacto'
+    },
+    modules: [
+      {
+        type: 'text',
+        heading: 'Qué nos diferencia',
+        body: 'Planificación, dirección visual y postproducción coherente con la identidad de cada cliente.',
+        order: 1
+      }
+    ],
+    seo: {
+      title: 'Sobre Vorágine Estudio',
+      description: 'Conoce al equipo y la metodología de trabajo de Vorágine Estudio.',
+      canonical: '/sobre-nosotros'
+    }
+  },
+  {
+    name: 'Contacto',
+    slug: 'contacto',
+    hero: {
+      eyebrow: 'Contacto',
+      title: 'Cuéntanos tu proyecto',
+      subtitle: 'Respondemos en 24-48h con propuesta y próximos pasos.',
+      ctaLabel: 'Enviar mensaje',
+      ctaUrl: '#formulario-contacto'
+    },
+    seo: {
+      title: 'Contacto',
+      description: 'Escríbenos para reservar sesión o pedir presupuesto de fotografía.',
+      canonical: '/contacto'
+    }
+  },
+  {
+    name: 'Blog',
+    slug: 'blog',
+    hero: {
+      eyebrow: 'Blog',
+      title: 'Noticias y recursos',
+      subtitle: 'Tendencias, guías y procesos detrás de cada proyecto.',
+      ctaLabel: 'Últimos artículos',
+      ctaUrl: '#articulos'
+    },
+    seo: {
+      title: 'Blog de fotografía',
+      description: 'Artículos de fotografía para bodas, eventos y marcas.',
+      canonical: '/blog'
+    }
+  }
+];
 
 const settings = {
   siteName: 'Vorágine Estudio',
@@ -90,61 +225,169 @@ const settings = {
   address: 'Madrid, España',
   social: {
     instagram: 'https://instagram.com/voragineestudio',
-    facebook: '',
+    facebook: 'https://facebook.com/voragineestudio',
+    x: '',
+    tiktok: '',
     pinterest: ''
+  },
+  ctas: {
+    primaryLabel: 'Agenda una reunión',
+    primaryUrl: '/contacto',
+    secondaryLabel: 'Ver portfolio',
+    secondaryUrl: '/portfolio'
+  },
+  seo: {
+    defaultTitle: 'Vorágine Estudio | Fotografía profesional',
+    titleSuffix: 'Vorágine Estudio',
+    defaultDescription: 'Fotografía para bodas, eventos, retratos y proyectos comerciales.',
+    defaultOgImage: '',
+    twitterHandle: '',
+    locale: 'es_ES',
+    siteUrl: 'http://localhost:3000'
+  },
+  business: {
+    legalName: 'Vorágine Estudio',
+    city: 'Madrid',
+    country: 'España',
+    openingHours: ['Mon-Fri 10:00-19:00']
   }
+};
+
+const projects = [
+  {
+    title: 'Boda Elena y Javier',
+    slug: 'boda-elena-javier',
+    description: 'Cobertura documental de boda en finca urbana.',
+    category: 'bodas',
+    tags: ['bodas', 'documental'],
+    featured: true,
+    order: 1,
+    images: [
+      { url: '/images/portfolio/boda-1.jpg', alt: 'Novios durante la ceremonia', order: 1, width: 1600, height: 1066 },
+      { url: '/images/portfolio/boda-2.jpg', alt: 'Celebración con invitados', order: 2, width: 1600, height: 1066 }
+    ],
+    coverImage: '/images/portfolio/boda-cover.jpg'
+  },
+  {
+    title: 'Lanzamiento de producto Lumen',
+    slug: 'lanzamiento-lumen',
+    description: 'Evento de marca con cobertura para prensa y social media.',
+    category: 'eventos',
+    tags: ['eventos', 'corporativo'],
+    featured: true,
+    order: 2,
+    images: [
+      { url: '/images/portfolio/evento-1.jpg', alt: 'Presentación de producto', order: 1, width: 1600, height: 1066 },
+      { url: '/images/portfolio/evento-2.jpg', alt: 'Networking y asistentes', order: 2, width: 1600, height: 1066 }
+    ],
+    coverImage: '/images/portfolio/evento-cover.jpg'
+  }
+];
+
+const legacyContent = {
+  hero: {
+    title: 'Capturamos instantes que no vuelven',
+    subtitle: 'Fotografía artística para momentos únicos',
+    cta: 'Contáctanos'
+  },
+  services: {
+    title: 'Qué hacemos',
+    subtitle: 'Especialistas en capturar la esencia de cada momento',
+    items: services.map((service) => ({
+      id: service.slug,
+      title: service.title,
+      description: service.excerpt
+    }))
+  }
+};
+
+const resetCollections = async () => {
+  await Promise.all([
+    Admin.deleteMany({}),
+    Category.deleteMany({}),
+    Gallery.deleteMany({}),
+    Service.deleteMany({}),
+    Page.deleteMany({}),
+    Post.deleteMany({}),
+    Testimonial.deleteMany({}),
+    Settings.deleteMany({}),
+    Content.deleteMany({}),
+    Message.deleteMany({})
+  ]);
 };
 
 const seedDatabase = async () => {
   try {
+    if (!process.env.MONGODB_URI) {
+      throw new Error('MONGODB_URI is required to seed the database');
+    }
+
     await mongoose.connect(process.env.MONGODB_URI);
     console.log('Connected to MongoDB');
-    
-    await Admin.deleteMany({});
-    const admin = new Admin({
+
+    await resetCollections();
+    console.log('Collections cleaned');
+
+    const admin = await Admin.create({
       username: 'admin',
-      password: 'admin123',
+      password: 'admin12345',
       email: 'admin@voragineestudio.com',
-      name: 'Administrador'
+      name: 'Administrador',
+      role: 'admin',
+      active: true
     });
-    await admin.save();
-    console.log('Admin user created');
-    
-    await Category.deleteMany({});
-    const categoryDocs = await Category.insertMany(categories);
+
+    await Admin.create({
+      username: 'editor',
+      password: 'editor12345',
+      email: 'editor@voragineestudio.com',
+      name: 'Editor',
+      role: 'editor',
+      active: true
+    });
+    console.log('Users created');
+
+    const createdCategories = await Category.insertMany(categories);
+    const categoryMap = createdCategories.reduce((acc, item) => {
+      acc[item.slug] = item._id;
+      return acc;
+    }, {});
     console.log('Categories created');
-    
-    const categoryMap = {};
-    categoryDocs.forEach(cat => {
-      categoryMap[cat.slug] = cat._id;
-    });
-    
-    await Gallery.deleteMany({});
-    for (const gallery of sampleGalleries) {
-      const newGallery = new Gallery({
-        ...gallery,
-        category: categoryMap[gallery.category]
-      });
-      await newGallery.save();
-    }
-    console.log('Galleries created');
-    
-    await Content.deleteMany({});
-    for (const [section, data] of Object.entries(content)) {
-      await Content.create({ section, data });
-    }
-    console.log('Content created');
-    
-    await Settings.deleteMany({});
+
+    await Service.insertMany(services);
+    console.log('Services created');
+
+    await Testimonial.insertMany(testimonials);
+    console.log('Testimonials created');
+
+    await Post.insertMany(posts);
+    console.log('Posts created');
+
+    await Page.insertMany(pages);
+    console.log('Pages created');
+
     await Settings.create(settings);
     console.log('Settings created');
-    
-    console.log('\n✅ Database seeded successfully!');
-    console.log('\n📝 Admin credentials:');
-    console.log('   Username: admin');
-    console.log('   Password: admin123');
-    console.log('\n🚀 You can now start the server with: npm start');
-    
+
+    await Content.insertMany(
+      Object.entries(legacyContent).map(([section, data]) => ({ section, data }))
+    );
+    console.log('Legacy content created');
+
+    const normalizedProjects = projects.map((project) => ({
+      ...project,
+      category: categoryMap[project.category]
+    }));
+    await Gallery.insertMany(normalizedProjects);
+    console.log('Portfolio projects created');
+
+    console.log('\n✅ Database seeded successfully');
+    console.log('\n📝 Credentials:');
+    console.log('   admin / admin12345');
+    console.log('   editor / editor12345');
+    console.log('\n🚀 Start API with: npm run dev');
+    console.log(`\nSeed finished for user: ${admin.username}`);
+
     process.exit(0);
   } catch (error) {
     console.error('Error seeding database:', error);
